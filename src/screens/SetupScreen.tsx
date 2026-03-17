@@ -168,7 +168,7 @@ export default function SetupScreen({ navigation }: Props) {
         style={styles.input}
         value={name}
         onChangeText={setName}
-        placeholder="e.g. Rajan"
+        placeholder="e.g. RG"
       />
 
       <Text style={styles.label}>Gotra (गोत्र)</Text>
@@ -176,7 +176,7 @@ export default function SetupScreen({ navigation }: Props) {
         style={styles.input}
         value={gotra}
         onChangeText={setGotra}
-        placeholder="e.g. Kashyap"
+        placeholder="e.g. Pat Svamina Kaushika"
       />
 
       <Text style={styles.label}>Lunar Month (मास)</Text>

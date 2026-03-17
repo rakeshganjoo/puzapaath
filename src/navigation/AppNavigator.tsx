@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform, Text, TouchableOpacity } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
 import SamagriScreen from '../screens/SamagriScreen';
@@ -20,13 +21,22 @@ export default function AppNavigator() {
   return (
     <Stack.Navigator
       initialRouteName="Home"
-      screenOptions={{
+      screenOptions={({ navigation: nav }) => ({
         headerStyle: { backgroundColor: '#fff' },
         headerTintColor: '#2D2D3A',
         headerTitleStyle: { fontWeight: '600', fontSize: 17 },
         contentStyle: { backgroundColor: '#F5F5F8' },
         headerShadowVisible: false,
-      }}
+        ...(Platform.OS === 'web' && nav.canGoBack()
+          ? {
+              headerLeft: () => (
+                <TouchableOpacity onPress={() => nav.goBack()} style={{ paddingRight: 12 }}>
+                  <Text style={{ fontSize: 17, color: '#6C5CE7', fontWeight: '600' }}>{'‹ Back'}</Text>
+                </TouchableOpacity>
+              ),
+            }
+          : {}),
+      })}
     >
       <Stack.Screen
         name="Home"
