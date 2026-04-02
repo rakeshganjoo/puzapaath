@@ -1,6 +1,5 @@
-import { Audio } from 'expo-av';
-import type { AVPlaybackStatus } from 'expo-av';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createAudioPlayer, type AudioPlayer, type AudioStatus } from 'expo-audio';
+import { get, set } from './StorageService';
 
 const NARRATION_LANG_KEY = '@narration_lang';
 
@@ -128,37 +127,37 @@ function getNarrationAudioMap(lang: NarrationLang): Record<string, ReturnType<ty
 }
 
 // --- Dual-channel state ---
-let mantraSound: Audio.Sound | null = null;
+let mantraPlayer: AudioPlayer | null = null;
 let mantraId: string | null = null;
 let mantraCallback: PlaybackCallback | null = null;
 let mantraRate = 1.0;
+let mantraSub: { remove: () => void } | null = null;
 
-let narrationSound: Audio.Sound | null = null;
+let narrationPlayer: AudioPlayer | null = null;
 let narrationId: string | null = null;
 let narrationCallback: PlaybackCallback | null = null;
+let narrationSub: { remove: () => void } | null = null;
 
 export type PlaybackState = 'stopped' | 'playing' | 'paused' | 'loading';
 export type PlaybackCallback = (state: PlaybackState, positionMs: number, durationMs: number) => void;
 
 // --- Internal handlers ---
-function handleMantraStatus(status: AVPlaybackStatus) {
-  if (!status.isLoaded) return;
+function handleMantraStatus(status: AudioStatus) {
   if (status.didJustFinish) {
-    mantraCallback?.('stopped', 0, status.durationMillis ?? 0);
+    mantraCallback?.('stopped', 0, (status.duration ?? 0) * 1000);
     return;
   }
-  const state: PlaybackState = status.isPlaying ? 'playing' : 'paused';
-  mantraCallback?.(state, status.positionMillis, status.durationMillis ?? 0);
+  const state: PlaybackState = status.playing ? 'playing' : 'paused';
+  mantraCallback?.(state, (status.currentTime ?? 0) * 1000, (status.duration ?? 0) * 1000);
 }
 
-function handleNarrationStatus(status: AVPlaybackStatus) {
-  if (!status.isLoaded) return;
+function handleNarrationStatus(status: AudioStatus) {
   if (status.didJustFinish) {
-    narrationCallback?.('stopped', 0, status.durationMillis ?? 0);
+    narrationCallback?.('stopped', 0, (status.duration ?? 0) * 1000);
     return;
   }
-  const state: PlaybackState = status.isPlaying ? 'playing' : 'paused';
-  narrationCallback?.(state, status.positionMillis, status.durationMillis ?? 0);
+  const state: PlaybackState = status.playing ? 'playing' : 'paused';
+  narrationCallback?.(state, (status.currentTime ?? 0) * 1000, (status.duration ?? 0) * 1000);
 }
 
 // --- Mantra playback ---
@@ -166,14 +165,12 @@ export async function playMantra(stepId: string, callback?: PlaybackCallback): P
   const asset = MANTRA_AUDIO[stepId];
   if (!asset) return;
 
-  if (mantraId === stepId && mantraSound) {
-    const status = await mantraSound.getStatusAsync();
-    if (status.isLoaded && status.isPlaying) {
-      await mantraSound.pauseAsync();
+  if (mantraId === stepId && mantraPlayer) {
+    if (mantraPlayer.playing) {
+      mantraPlayer.pause();
       return;
-    }
-    if (status.isLoaded && !status.isPlaying) {
-      await mantraSound.playAsync();
+    } else {
+      mantraPlayer.play();
       return;
     }
   }
@@ -182,23 +179,22 @@ export async function playMantra(stepId: string, callback?: PlaybackCallback): P
   mantraCallback = callback ?? null;
   callback?.('loading', 0, 0);
 
-  const { sound } = await Audio.Sound.createAsync(asset, {
-    shouldPlay: true,
-    rate: mantraRate,
-    shouldCorrectPitch: true,
-  });
-  mantraSound = sound;
+  const player = createAudioPlayer(asset);
+  player.playbackRate = mantraRate;
+  mantraSub = player.addListener('playbackStatusUpdate', handleMantraStatus);
+  mantraPlayer = player;
   mantraId = stepId;
-  sound.setOnPlaybackStatusUpdate(handleMantraStatus);
+  player.play();
 }
 
 export async function stopMantra(): Promise<void> {
-  if (mantraSound) {
+  if (mantraPlayer) {
     try {
-      await mantraSound.stopAsync();
-      await mantraSound.unloadAsync();
+      mantraSub?.remove();
+      mantraPlayer.remove();
     } catch { /* ignore */ }
-    mantraSound = null;
+    mantraPlayer = null;
+    mantraSub = null;
     mantraId = null;
     mantraCallback?.('stopped', 0, 0);
     mantraCallback = null;
@@ -207,9 +203,9 @@ export async function stopMantra(): Promise<void> {
 
 export async function setMantraSpeed(rate: number): Promise<void> {
   mantraRate = rate;
-  if (mantraSound) {
+  if (mantraPlayer) {
     try {
-      await mantraSound.setRateAsync(rate, true);
+      mantraPlayer.playbackRate = rate;
     } catch { /* ignore */ }
   }
 }
@@ -223,7 +219,7 @@ let currentNarrationLang: NarrationLang = 'hi';
 
 export function setNarrationLang(lang: NarrationLang): void {
   currentNarrationLang = lang;
-  AsyncStorage.setItem(NARRATION_LANG_KEY, lang).catch(() => {});
+  set(NARRATION_LANG_KEY, lang).catch(() => {});
 }
 
 export function getNarrationLang(): NarrationLang {
@@ -231,7 +227,7 @@ export function getNarrationLang(): NarrationLang {
 }
 
 export async function loadNarrationLang(): Promise<NarrationLang> {
-  const saved = await AsyncStorage.getItem(NARRATION_LANG_KEY);
+  const saved = await get(NARRATION_LANG_KEY);
   if (saved === 'en' || saved === 'hi') {
     currentNarrationLang = saved;
   }
@@ -244,14 +240,12 @@ export async function playNarration(stepId: string, callback?: PlaybackCallback,
   const asset = audioMap[stepId];
   if (!asset) return;
 
-  if (narrationId === stepId && narrationSound) {
-    const status = await narrationSound.getStatusAsync();
-    if (status.isLoaded && status.isPlaying) {
-      await narrationSound.pauseAsync();
+  if (narrationId === stepId && narrationPlayer) {
+    if (narrationPlayer.playing) {
+      narrationPlayer.pause();
       return;
-    }
-    if (status.isLoaded && !status.isPlaying) {
-      await narrationSound.playAsync();
+    } else {
+      narrationPlayer.play();
       return;
     }
   }
@@ -260,19 +254,21 @@ export async function playNarration(stepId: string, callback?: PlaybackCallback,
   narrationCallback = callback ?? null;
   callback?.('loading', 0, 0);
 
-  const { sound } = await Audio.Sound.createAsync(asset, { shouldPlay: true });
-  narrationSound = sound;
+  const player = createAudioPlayer(asset);
+  narrationSub = player.addListener('playbackStatusUpdate', handleNarrationStatus);
+  narrationPlayer = player;
   narrationId = stepId;
-  sound.setOnPlaybackStatusUpdate(handleNarrationStatus);
+  player.play();
 }
 
 export async function stopNarration(): Promise<void> {
-  if (narrationSound) {
+  if (narrationPlayer) {
     try {
-      await narrationSound.stopAsync();
-      await narrationSound.unloadAsync();
+      narrationSub?.remove();
+      narrationPlayer.remove();
     } catch { /* ignore */ }
-    narrationSound = null;
+    narrationPlayer = null;
+    narrationSub = null;
     narrationId = null;
     narrationCallback?.('stopped', 0, 0);
     narrationCallback = null;

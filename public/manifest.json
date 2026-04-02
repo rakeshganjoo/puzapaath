@@ -1,0 +1,31 @@
+{
+  "name": "Janthari - Hindu Calendar & Puja Guide",
+  "short_name": "Janthari",
+  "description": "Janthari - Your personal Hindu calendar, puja guide, and auspicious timing companion",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5E6C8",
+  "theme_color": "#F5E6C8",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

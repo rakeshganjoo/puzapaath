@@ -7,36 +7,29 @@ import {
   StyleSheet,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/AppNavigator';
-import pujaData from '../data/pujaData';
+import type { RootStackParamList } from '../navigation/types';
+import { getPujaParts } from '../services/PujaService';
 import MantraDisplay from '../components/MantraDisplay';
 import {
-  stopAll,
-  playNarration,
-  stopNarration,
-  hasNarrationAudio,
-  getNarrationLang,
-  setNarrationLang,
-  loadNarrationLang,
-  hasMantraAudio,
   playMantraSequence,
   stopSequence,
-  stopMantra,
-  type PlaybackState,
+  stopMantra as svcStopMantra,
 } from '../services/AudioService';
-import { getNarration, type NarrationLang } from '../data/narrations';
+import { useAudio } from '../contexts/AudioContext';
+import { getNarration } from '../data/narrations';
+import type { NarrationLang } from '../contexts/AudioContext';
 import type { ScriptType } from '../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StepDetail'>;
 
 export default function StepDetailScreen({ route, navigation }: Props) {
   const { partId, stepIndex } = route.params;
-  const part = pujaData.parts.find((p) => p.id === partId);
+  const part = getPujaParts().find((p) => p.id === partId);
+  const audio = useAudio();
+  const { narration, narrationLang, playNarration, stopNarration, setNarrationLang, hasNarrationAudio, hasMantraAudio, stopAll } = audio;
+
   const [script, setScript] = useState<ScriptType>('roman');
   const [expandedSub, setExpandedSub] = useState<string | null>(null);
-  const [narrState, setNarrState] = useState<PlaybackState>('stopped');
-  const [narrProgress, setNarrProgress] = useState(0);
-  const [narrLang, setNarrLang] = useState<NarrationLang>(getNarrationLang());
   const [autoPlayIndex, setAutoPlayIndex] = useState(-1); // -1 = not playing
   const [autoPlayProgress, setAutoPlayProgress] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
@@ -47,11 +40,11 @@ export default function StepDetailScreen({ route, navigation }: Props) {
 
   const hasNext = stepIndex < part.steps.length - 1;
   const hasPrev = stepIndex > 0;
-  const partIndex = pujaData.parts.findIndex((p) => p.id === partId);
-  const nextPart = pujaData.parts[partIndex + 1];
+  const partIndex = getPujaParts().findIndex((p) => p.id === partId);
+  const nextPart = getPujaParts()[partIndex + 1];
 
-  const narrationText = getNarration(step.id, narrLang);
-  const hasNarr = hasNarrationAudio(step.id, narrLang);
+  const narrationText = getNarration(step.id, narrationLang);
+  const hasNarr = hasNarrationAudio(step.id, narrationLang);
 
   // Stop all audio when navigating away
   useEffect(() => {
@@ -61,39 +54,22 @@ export default function StepDetailScreen({ route, navigation }: Props) {
     };
   }, [partId, stepIndex]);
 
-  // Load persisted narration language
-  useEffect(() => {
-    loadNarrationLang().then((lang) => setNarrLang(lang));
-  }, []);
-
-  // Auto-play narration when step loads
+  // Auto-play narration when step loads (or language changes)
   useEffect(() => {
     if (hasNarr) {
-      playNarration(step.id, (state, posMs, durMs) => {
-        setNarrState(state);
-        setNarrProgress(durMs > 0 ? posMs / durMs : 0);
-      }, narrLang);
+      playNarration(step.id, narrationLang);
     }
-  }, [step.id, hasNarr, narrLang]);
+  }, [step.id, hasNarr, narrationLang]);
 
   const handleNarrationToggle = useCallback(async () => {
-    if (narrState === 'playing') {
-      await playNarration(step.id, undefined, narrLang); // toggles to pause
-    } else {
-      await playNarration(step.id, (state, posMs, durMs) => {
-        setNarrState(state);
-        setNarrProgress(durMs > 0 ? posMs / durMs : 0);
-      }, narrLang);
-    }
-  }, [step.id, narrState, narrLang]);
+    // AudioService handles play/pause toggle internally when called with the same stepId
+    await playNarration(step.id, narrationLang);
+  }, [step.id, narrationLang, playNarration]);
 
   const handleLangSwitch = useCallback(async (lang: NarrationLang) => {
     await stopNarration();
-    setNarrState('stopped');
-    setNarrProgress(0);
-    setNarrLang(lang);
     setNarrationLang(lang);
-  }, []);
+  }, [stopNarration, setNarrationLang]);
 
   // Determine if this step supports auto-play (has sub-steps with audio)
   const autoPlayIds = React.useMemo(() => {
@@ -106,7 +82,7 @@ export default function StepDetailScreen({ route, navigation }: Props) {
     if (isAutoPlaying) {
       // Stop
       stopSequence();
-      await stopMantra();
+      await svcStopMantra();
       setIsAutoPlaying(false);
       setAutoPlayIndex(-1);
       setAutoPlayProgress(0);
@@ -114,7 +90,6 @@ export default function StepDetailScreen({ route, navigation }: Props) {
     }
 
     await stopNarration();
-    setNarrState('stopped');
     setIsAutoPlaying(true);
 
     const pauseMs = step.id === 'B9' ? 2000 : 5000;
@@ -141,7 +116,7 @@ export default function StepDetailScreen({ route, navigation }: Props) {
       },
       pauseMs,
     );
-  }, [isAutoPlaying, autoPlayIds, step]);
+  }, [isAutoPlaying, autoPlayIds, step, stopNarration]);
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
@@ -151,6 +126,27 @@ export default function StepDetailScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      {/* Progress bar + breadcrumb at top */}
+      <View style={styles.progressHeader}>
+        <View style={styles.breadcrumb}>
+          <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+            <Text style={styles.breadcrumbText}>Home</Text>
+          </TouchableOpacity>
+          <Text style={styles.breadcrumbSep}> › </Text>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.breadcrumbText}>{partId === 'A' ? 'Aarambh' : partId === 'B' ? 'Archana' : 'Visarjan'}</Text>
+          </TouchableOpacity>
+          <Text style={styles.breadcrumbSep}> › </Text>
+          <Text style={styles.breadcrumbCurrent}>Step {step.number}</Text>
+        </View>
+        <Text style={styles.progressText}>
+          {stepIndex + 1} of {part.steps.length}
+        </Text>
+        <View style={styles.progressBarBg}>
+          <View style={[styles.progressBarFill, { width: `${((stepIndex + 1) / part.steps.length) * 100}%` }]} />
+        </View>
+      </View>
+
       <ScrollView contentContainerStyle={styles.content}>
         {/* Step header */}
         <View style={styles.stepHeader}>
@@ -173,31 +169,31 @@ export default function StepDetailScreen({ route, navigation }: Props) {
                 {/* Language toggle */}
                 <View style={styles.langToggle}>
                   <TouchableOpacity
-                    style={[styles.langBtn, narrLang === 'en' && styles.langBtnActive]}
+                    style={[styles.langBtn, narrationLang === 'en' && styles.langBtnActive]}
                     onPress={() => handleLangSwitch('en')}
                   >
-                    <Text style={[styles.langBtnText, narrLang === 'en' && styles.langBtnTextActive]}>EN</Text>
+                    <Text style={[styles.langBtnText, narrationLang === 'en' && styles.langBtnTextActive]}>EN</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.langBtn, narrLang === 'hi' && styles.langBtnActive]}
+                    style={[styles.langBtn, narrationLang === 'hi' && styles.langBtnActive]}
                     onPress={() => handleLangSwitch('hi')}
                   >
-                    <Text style={[styles.langBtnText, narrLang === 'hi' && styles.langBtnTextActive]}>हिं</Text>
+                    <Text style={[styles.langBtnText, narrationLang === 'hi' && styles.langBtnTextActive]}>HI</Text>
                   </TouchableOpacity>
                 </View>
                 {hasNarr && (
                   <TouchableOpacity style={styles.narrPlayBtn} onPress={handleNarrationToggle}>
                     <Text style={styles.narrPlayIcon}>
-                      {narrState === 'playing' ? '⏸' : '🔊'}
+                      {narration.state === 'playing' ? '⏸' : '🔊'}
                   </Text>
                 </TouchableOpacity>
               )}
               </View>
             </View>
             <Text style={styles.narrationText}>{narrationText}</Text>
-            {hasNarr && (narrState === 'playing' || narrState === 'paused') && (
+            {hasNarr && (narration.state === 'playing' || narration.state === 'paused') && (
               <View style={styles.narrProgressContainer}>
-                <View style={[styles.narrProgressBar, { width: `${narrProgress * 100}%` }]} />
+                <View style={[styles.narrProgressBar, { width: `${(narration.durationMs > 0 ? narration.positionMs / narration.durationMs : 0) * 100}%` }]} />
               </View>
             )}
           </View>
@@ -228,7 +224,7 @@ export default function StepDetailScreen({ route, navigation }: Props) {
                   onPress={() => setScript(s)}
                 >
                   <Text style={[styles.scriptBtnText, script === s && styles.scriptBtnTextActive]}>
-                    {s === 'devanagari' ? 'देवनागरी' : s === 'roman' ? 'Roman' : 'English'}
+                    {s === 'devanagari' ? 'Devanagari' : s === 'roman' ? 'Roman' : 'English'}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -320,38 +316,37 @@ export default function StepDetailScreen({ route, navigation }: Props) {
             <Text style={styles.navBtnText}>‹ Prev</Text>
           </TouchableOpacity>
         ) : (
-          <View />
+          <TouchableOpacity
+            style={styles.navBtn}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.navBtnText}>‹ Steps</Text>
+          </TouchableOpacity>
         )}
-        <TouchableOpacity
-          style={[styles.navBtn, { backgroundColor: '#6C5CE7' }]}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={[styles.navBtnText, { color: '#fff' }]}>All Steps</Text>
-        </TouchableOpacity>
         {hasNext ? (
           <TouchableOpacity
-            style={[styles.navBtn, { backgroundColor: '#6C5CE7' }]}
+            style={[styles.navBtn, styles.navBtnPrimary]}
             onPress={() =>
               navigation.replace('StepDetail', { partId, stepIndex: stepIndex + 1 })
             }
           >
-            <Text style={[styles.navBtnText, { color: '#fff' }]}>Next ›</Text>
+            <Text style={styles.navBtnTextPrimary}>Next ›</Text>
           </TouchableOpacity>
         ) : nextPart ? (
           <TouchableOpacity
-            style={[styles.navBtn, { backgroundColor: '#6C5CE7' }]}
+            style={[styles.navBtn, styles.navBtnPrimary]}
             onPress={() =>
               navigation.replace('PujaNavigator', { partId: nextPart.id })
             }
           >
-            <Text style={[styles.navBtnText, { color: '#fff' }]}>Part {nextPart.id} ›</Text>
+            <Text style={styles.navBtnTextPrimary}>{nextPart.id === 'A' ? 'Aarambh' : nextPart.id === 'B' ? 'Archana' : 'Visarjan'} ›</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.navBtn, { backgroundColor: '#6C5CE7' }]}
+            style={[styles.navBtn, styles.navBtnPrimary]}
             onPress={() => navigation.navigate('Home')}
           >
-            <Text style={[styles.navBtnText, { color: '#fff' }]}>Done</Text>
+            <Text style={styles.navBtnTextPrimary}>Puza Sampann 🙏</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -361,6 +356,33 @@ export default function StepDetailScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F8' },
+  progressHeader: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EAEAEF',
+  },
+  breadcrumb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  breadcrumbText: { fontSize: 12, color: '#6C5CE7', fontWeight: '500' },
+  breadcrumbSep: { fontSize: 12, color: '#CCC' },
+  breadcrumbCurrent: { fontSize: 12, color: '#888', fontWeight: '500' },
+  progressText: { fontSize: 11, color: '#999', marginBottom: 4 },
+  progressBarBg: {
+    height: 3,
+    backgroundColor: '#EAEAEF',
+    borderRadius: 2,
+  },
+  progressBarFill: {
+    height: 3,
+    backgroundColor: '#6C5CE7',
+    borderRadius: 2,
+  },
   content: { padding: 20 },
   stepHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   stepNumber: {
@@ -485,6 +507,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F0F5',
   },
   navBtnText: { fontSize: 14, fontWeight: '600', color: '#2D2D3A' },
+  navBtnPrimary: { backgroundColor: '#6C5CE7' },
+  navBtnTextPrimary: { fontSize: 14, fontWeight: '600', color: '#fff' },
   narrationCard: {
     backgroundColor: '#fff',
     borderRadius: 14,

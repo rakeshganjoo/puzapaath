@@ -1,180 +1,490 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  Image,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/AppNavigator';
-import pujaData from '../data/pujaData';
-import { getActiveProfile, type UserProfile } from '../services/ProfileService';
+import type { RootStackParamList } from '../navigation/types';
+import { gregorianToLunar, DAYS } from '../services/HinduCalendar';
+import { KP_FESTIVALS, getMonthlyObservances, type KPFestival } from '../data/kpFestivals';
+import { useTheme } from '../contexts/UIContext';
+import type { AppLocale } from '../i18n/translations';
+
+const logoImg = require('../assets/images/tiles/jan-swastik_tile.jpeg');
+const ganeshaImg = require('../assets/images/tiles/jan-ganesha_tile.jpeg');
+const bramhaImg = require('../assets/images/tiles/jan-bramha_tile.jpeg');
+const birthdayImg = require('../assets/images/tiles/jan-birthday_tile2.jpeg');
+const tekniImg = require('../assets/images/tiles/jan-tekni_tile.jpeg');
+const zatukImg = require('../assets/images/tiles/jan-zatuk_tile.jpeg');
+const tithiImg = require('../assets/images/tiles/jan-tithi_tile.jpeg');
+const saathImg = require('../assets/images/tiles/jan-saath_tile.jpeg');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-export default function HomeScreen({ navigation }: Props) {
-  const [activeProfile, setActiveProfile] = useState<UserProfile | null>(null);
+const MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+];
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      getActiveProfile().then(setActiveProfile);
-    });
-    return unsubscribe;
-  }, [navigation]);
+import type { ImageSourcePropType } from 'react-native';
+
+type Tile = {
+  icon: string;
+  title: string;
+  sub: string;
+  screen?: keyof RootStackParamList;
+  soon?: boolean;
+  img?: ImageSourcePropType;
+};
+
+type LayoutProfile = 'mobile' | 'tablet' | 'desktop';
+
+function detectWebBrowser(): 'chrome' | 'safari' | 'edge' | 'firefox' | 'other' {
+  if (Platform.OS !== 'web' || typeof navigator === 'undefined') return 'other';
+  const ua = navigator.userAgent;
+  if (/Edg\//i.test(ua)) return 'edge';
+  if (/Firefox\//i.test(ua)) return 'firefox';
+  if (/Chrome\//i.test(ua) && !/Edg\//i.test(ua)) return 'chrome';
+  if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) return 'safari';
+  return 'other';
+}
+
+export default function HomeScreen({ navigation }: Props) {
+  const { locale, setLocale, t } = useTheme();
+  const { width } = useWindowDimensions();
+
+  const browser = useMemo(() => detectWebBrowser(), []);
+  const isWeb = Platform.OS === 'web';
+  const profile: LayoutProfile = width >= 1100 ? 'desktop' : width >= 760 ? 'tablet' : 'mobile';
+  const columns = profile === 'desktop' ? 3 : 2;
+  const horizontalPadding = profile === 'mobile' ? 14 : 20;
+  const gridGap = profile === 'mobile' ? 10 : 14;
+  const maxContentWidth = profile === 'desktop' ? 1120 : profile === 'tablet' ? 860 : 460;
+  const contentWidth = Math.min(width - horizontalPadding * 2, maxContentWidth);
+  const tileWidth = Math.max(148, Math.floor((contentWidth - gridGap * (columns - 1)) / columns));
+
+  const tileMinHeight = profile === 'mobile' ? 168 : 182;
+  const titleSize = profile === 'mobile' ? 15 : 17;
+  const subtitleSize = profile === 'mobile' ? 12 : 13;
+
+  const tiles: Tile[] = [
+    {
+      icon: '\u25C9',
+      img: ganeshaImg,
+      title: t('home.tiles.calendarTitle', 'KP Calendar'),
+      sub: t('home.tiles.calendarSub', 'Festivals - Tithis - Print'),
+      screen: 'Calendar',
+    },
+    {
+      icon: '\u25C8',
+      img: tithiImg,
+      title: t('home.tiles.tithiTitle', 'Tithi Calculator'),
+      sub: t('home.tiles.tithiSub', 'Find lunar date for any day'),
+      screen: 'TithiCalculator',
+    },
+    {
+      icon: '\u2737',
+      img: saathImg,
+      title: t('home.tiles.muhuratTitle', 'Shubh Muhurat Finder'),
+      sub: t('home.tiles.muhuratSub', 'Auspicious time for events'),
+      screen: 'MuhuratEventPicker',
+    },
+    {
+      icon: '\u2726',
+      img: birthdayImg,
+      title: t('home.tiles.pujaTitle', "Pu'za Paath (Interactive)"),
+      sub: t('home.tiles.pujaSub', 'JanamDin - Step by step'),
+      screen: 'PujaHome',
+    },
+    {
+      icon: '\u25CE',
+      img: tekniImg,
+      title: t('home.tiles.tekniTitle', 'Tekni Making'),
+      sub: t('home.tiles.tekniSub', 'Janam Kundali and PDF'),
+      screen: 'TekniInput',
+    },
+    {
+      icon: '\u2739',
+      img: zatukImg,
+      title: t('home.tiles.zatukTitle', 'Zatuk'),
+      sub: t('home.tiles.zatukSub', 'Full Horoscope and Kundali'),
+      soon: true,
+    },
+    {
+      icon: '\u272D',
+      img: bramhaImg,
+      title: t('home.tiles.jyotishTitle', 'Jyotish'),
+      sub: t('home.tiles.jyotishSub', 'Vedic Astrology'),
+      soon: true,
+    },
+  ];
+
+  const today = new Date();
+  const ds = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const lunar = useMemo(() => gregorianToLunar(ds), [ds]);
+
+  const todayFestivals = useMemo(() => {
+    if (!lunar) return [];
+    return KP_FESTIVALS.filter(
+      f => (f.lunarMonth === lunar.lunarMonth || f.lunarMonthAlt === lunar.lunarMonth)
+        && f.paksha === lunar.paksha && f.tithi === lunar.tithiNum,
+    );
+  }, [lunar]);
+
+  const todayObs = useMemo(() => {
+    if (!lunar) return [];
+    return getMonthlyObservances(lunar.tithiNum, lunar.paksha);
+  }, [lunar]);
+
+  const greg = `${MONTHS[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}`;
+  const day = DAYS[today.getDay()];
+  const tithi = lunar
+    ? lunar.tithiNum === 15
+      ? (lunar.paksha === 'shukla'
+        ? `${t('common.purnima', 'Purnima')} (15)`
+        : `${t('common.amavasya', 'Amavasya')} (15)`)
+      : lunar.tithi
+    : '';
+
+  const languageButtons: { code: AppLocale; label: string }[] = [
+    { code: 'en', label: t('home.languageShort.en', 'EN') },
+    { code: 'hi', label: t('home.languageShort.hi', 'HI') },
+    { code: 'ks', label: t('home.languageShort.ks', 'KS') },
+  ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.titleDev}>जन्मदिन पूजा</Text>
-        <Text style={styles.titleEng}>Birthday Puja</Text>
-        <Text style={styles.subtitle}>Kashmiri Pandit Tradition</Text>
-      </View>
-
-      {/* Active profile banner */}
-      {activeProfile && (
-        <TouchableOpacity
-          style={styles.profileBanner}
-          onPress={() => navigation.navigate('Setup')}
+    <ScrollView style={st.scroll} contentContainerStyle={st.scrollInner}>
+      <View style={[st.container, { width: contentWidth }]}> 
+        <LinearGradient
+          colors={['#FEF8E8', '#F3F0EB', '#F8F4EF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={st.heroCard}
         >
-          <Text style={styles.profileBannerLabel}>Active Profile</Text>
-          <Text style={styles.profileBannerName}>{activeProfile.personName}</Text>
-          <Text style={styles.profileBannerDetail}>
-            {activeProfile.gotra} • {activeProfile.lunarMonth || '—'} • {activeProfile.tithi || '—'}
-          </Text>
-          <Text style={styles.profileBannerSwitch}>Tap to switch ›</Text>
-        </TouchableOpacity>
-      )}
+          <View style={st.geoCircleOuter} />
+          <View style={st.geoCircleInner} />
+          <View style={st.geoDiamond} />
 
-      {/* Description */}
-      <View style={styles.card}>
-        <Text style={styles.descText}>{pujaData.description}</Text>
-      </View>
-
-      {/* Setup Button */}
-      <TouchableOpacity
-        style={[styles.actionBtn, { backgroundColor: '#6C5CE7' }]}
-        onPress={() => navigation.navigate('Setup')}
-      >
-        <Text style={styles.actionBtnText}>Setup / संकल्प</Text>
-        <Text style={styles.actionBtnSub}>Enter name, gotra, date</Text>
-      </TouchableOpacity>
-
-      {/* Samagri Button */}
-      <TouchableOpacity
-        style={[styles.actionBtn, { backgroundColor: '#6C5CE7' }]}
-        onPress={() => navigation.navigate('Samagri')}
-      >
-        <Text style={styles.actionBtnText}>सामग्री — Materials</Text>
-        <Text style={styles.actionBtnSub}>
-          Checklist of {pujaData.samagri.length} items needed
-        </Text>
-      </TouchableOpacity>
-
-      {/* Puja Parts */}
-      <Text style={styles.sectionTitle}>Puja Sections</Text>
-      {pujaData.parts.map((part) => (
-        <TouchableOpacity
-          key={part.id}
-          style={styles.partCard}
-          onPress={() => navigation.navigate('PujaNavigator', { partId: part.id })}
-        >
-          <View style={styles.partBadge}>
-            <Text style={styles.partBadgeText}>{part.id}</Text>
+          <View style={st.headerTopRow}>
+            <Image source={logoImg} style={st.logo} />
+            <View style={st.headerText}>
+              <View style={st.nameRow}>
+                <Text style={st.nameDev}>{'\u091C\u0902\u0925\u094D\u0930\u0940'}</Text>
+                <Text style={st.nameEng}> Janthari</Text>
+              </View>
+              {lunar && (
+                <Text style={st.panchang} numberOfLines={2}>
+                  {greg} ({day}){'\n'}
+                  {lunar.lunarMonth} {'\u2022'} {lunar.paksha === 'shukla'
+                    ? t('common.shuklaPaksha', 'Shukla Paksha')
+                    : t('common.krishnaPaksha', 'Krishna Paksha')} {'\u2022'} {tithi}
+                </Text>
+              )}
+            </View>
           </View>
-          <View style={styles.partInfo}>
-            <Text style={styles.partTitleDev}>{part.title.devanagari}</Text>
-            <Text style={styles.partTitleEng}>{part.title.english}</Text>
-            <Text style={styles.partSub}>
-              {part.steps.length} steps • {part.subtitle}
+
+          <View style={st.langRow}>
+            <Text style={st.langLabel}>{t('common.language', 'Language')}:</Text>
+            {languageButtons.map((item) => (
+              <TouchableOpacity
+                key={item.code}
+                style={[st.langChip, locale === item.code && st.langChipActive]}
+                onPress={() => setLocale(item.code)}
+                accessibilityRole="button"
+                accessibilityLabel={`Switch language to ${item.label}`}
+              >
+                <Text style={[st.langChipText, locale === item.code && st.langChipTextActive]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {isWeb && (
+            <Text style={st.browserHint}>
+              {`Optimized for ${browser} on ${profile}`}
             </Text>
+          )}
+        </LinearGradient>
+
+        {(todayFestivals.length > 0 || todayObs.length > 0) && (
+          <View style={st.festPanel}>
+            {todayFestivals.slice(0, 2).map((f: KPFestival, i) => (
+              <View key={i} style={[st.festTag, f.category === 'major' && st.festMajor]}>
+                <Text style={[st.festText, f.category === 'major' && st.festMajorText]}>{f.name}</Text>
+              </View>
+            ))}
+            {todayObs.slice(0, 2).map((o, i) => (
+              <Text key={`o${i}`} style={st.obsText}>{'\u2022'} {o}</Text>
+            ))}
           </View>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
-      ))}
+        )}
 
-      {/* Start Puja Button */}
-      <TouchableOpacity
-        style={[styles.actionBtn, { backgroundColor: '#6C5CE7', marginTop: 20 }]}
-        onPress={() => navigation.navigate('PujaNavigator', { partId: 'A' })}
-      >
-        <Text style={styles.actionBtnText}>Start Full Puja</Text>
-        <Text style={styles.actionBtnSub}>Begin from Part A — Doop Deep Puja</Text>
-      </TouchableOpacity>
+        <View style={st.grid}>
+          {tiles.map((tile, i) => {
+            const endOfRow = (i + 1) % columns === 0;
+            const card = (
+              <View
+                style={[
+                  st.tile,
+                  tile.soon && st.tileSoon,
+                  {
+                    width: tileWidth,
+                    minHeight: tileMinHeight,
+                    marginRight: endOfRow ? 0 : gridGap,
+                  },
+                ]}
+              >
+                <View style={st.tileGeometry}>
+                  <Text style={st.tileGeometryText}>{tile.icon}</Text>
+                </View>
+                {tile.img ? <Image source={tile.img} style={st.tileImg} /> : null}
+                <Text style={[st.tileName, { fontSize: titleSize }]} numberOfLines={2}>{tile.title}</Text>
+                <Text style={[st.tileSub, { fontSize: subtitleSize }]} numberOfLines={2}>{tile.sub}</Text>
+                {tile.soon && (
+                  <View style={st.badge}><Text style={st.badgeText}>{t('common.comingSoon', 'Coming Soon')}</Text></View>
+                )}
+              </View>
+            );
 
-      <View style={{ height: 40 }} />
+            if (tile.screen) {
+              return (
+                <TouchableOpacity
+                  key={i}
+                  style={st.tileWrap}
+                  onPress={() => navigation.navigate(tile.screen as any)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${tile.title}. ${tile.sub}`}
+                >
+                  {card}
+                </TouchableOpacity>
+              );
+            }
+
+            return (
+              <View key={i} style={st.tileWrap}>
+                {card}
+              </View>
+            );
+          })}
+        </View>
+
+        <View style={st.footerCard}>
+          <Text style={st.footerText}>
+            {`🙏🏻Namaskar,\n\nThis is our humble effort to help the KP community stay rooted in our traditions and values, while making important dates and tithis easily accessible on the go.\n\nThe calendar and tithi outputs are mathematically computed using trusted astronomical references, with precise calculation logic down to very fine time fractions.\n\nFor complete transparency, we encourage you to explore the "How This Works" section to understand the methodology behind each result.\n\nWe will continue to improve the app with regular updates, while keeping the experience simple, consistent, and meaningful for everyone!`}
+          </Text>
+        </View>
+      </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F8' },
-  content: { padding: 20 },
-  header: { alignItems: 'center', paddingVertical: 30 },
-  titleDev: { fontSize: 32, fontWeight: '700', color: '#9A7B4F', letterSpacing: 0.5 },
-  titleEng: { fontSize: 20, fontWeight: '500', color: '#2D2D3A', marginTop: 6 },
-  subtitle: { fontSize: 13, color: '#999', marginTop: 4, letterSpacing: 0.3 },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
+const st = StyleSheet.create({
+  scroll: { flex: 1, backgroundColor: '#F4F4F7' },
+  scrollInner: { alignItems: 'center', paddingVertical: 6 },
+  container: { maxWidth: 1120 },
+
+  heroCard: {
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#EAEAEF',
+    borderColor: '#DBD3C3',
+    overflow: 'hidden',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    position: 'relative',
   },
-  descText: { fontSize: 14, color: '#666', lineHeight: 22 },
-  actionBtn: {
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 12,
-    alignItems: 'center',
+  geoCircleOuter: {
+    position: 'absolute',
+    right: -20,
+    top: -22,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 141, 95, 0.4)',
   },
-  actionBtnText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  actionBtnSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#2D2D3A',
-    marginTop: 24,
-    marginBottom: 12,
+  geoCircleInner: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(122, 129, 141, 0.45)',
   },
-  partCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  geoDiamond: {
+    position: 'absolute',
+    right: 46,
+    top: 52,
+    width: 14,
+    height: 14,
+    borderWidth: 1,
+    borderColor: '#A8895F',
+    transform: [{ rotate: '45deg' }],
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+  },
+
+  headerTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  logo: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D5C6AB',
     backgroundColor: '#fff',
+  },
+  headerText: { marginLeft: 8, flex: 1 },
+
+  langRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  langLabel: { fontSize: 10, color: '#6A6A6A', marginRight: 6, fontWeight: '600' },
+  langChip: {
+    borderWidth: 1,
+    borderColor: '#CFC8BA',
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginRight: 4,
+    marginBottom: 4,
+    backgroundColor: '#FFFFFFCC',
+  },
+  langChipActive: { borderColor: '#A8895F', backgroundColor: '#F9EFE0' },
+  langChipText: { fontSize: 9, color: '#666', fontWeight: '700' },
+  langChipTextActive: { color: '#75572F' },
+
+  nameRow: { flexDirection: 'row', alignItems: 'baseline' },
+  nameDev: { fontSize: 20, fontWeight: '800', color: '#8F744A' },
+  nameEng: { fontSize: 28, fontWeight: '700', color: '#2A2F38' },
+  panchang: { fontSize: 12, color: '#3E4660', fontWeight: '700', marginTop: 2, lineHeight: 17 },
+  browserHint: { fontSize: 9, color: '#777', marginTop: 1 },
+
+  festPanel: {
+    borderWidth: 1,
+    borderColor: '#E1D8C8',
+    backgroundColor: '#FBF7EE',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 6,
+  },
+  festTag: {
+    backgroundColor: '#ECE7DD',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 6,
+    alignSelf: 'flex-start',
+  },
+  festMajor: { backgroundColor: '#F4E6CE' },
+  festText: { fontSize: 11, fontWeight: '700', color: '#555' },
+  festMajorText: { color: '#7B5A2F' },
+  obsText: { fontSize: 12, color: '#696969', marginTop: 2 },
+
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'stretch',
+  },
+  tileWrap: {
+    marginBottom: 10,
+  },
+  tile: {
+    backgroundColor: '#FCFCFD',
     borderRadius: 14,
-    padding: 16,
+    borderWidth: 1,
+    borderColor: '#DDD9D0',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  tileSoon: { opacity: 0.52 },
+  tileGeometry: {
+    position: 'absolute',
+    top: 8,
+    right: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#C2B59A',
+    backgroundColor: '#F7EEE0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileGeometryText: { fontSize: 10, color: '#8E7653', fontWeight: '700' },
+  tileImg: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#EAEAEF',
-  },
-  partBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#6C5CE7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  partBadgeText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  partInfo: { flex: 1 },
-  partTitleDev: { fontSize: 16, fontWeight: '600', color: '#9A7B4F' },
-  partTitleEng: { fontSize: 14, color: '#2D2D3A', marginTop: 2 },
-  partSub: { fontSize: 12, color: '#999', marginTop: 4 },
-  arrow: { fontSize: 20, color: '#CCC' },
-  profileBanner: {
+    borderColor: '#E2DCCF',
     backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#6C5CE720',
-    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  profileBannerLabel: { fontSize: 11, color: '#6C5CE7', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-  profileBannerName: { fontSize: 18, fontWeight: '600', color: '#2D2D3A', marginTop: 4 },
-  profileBannerDetail: { fontSize: 13, color: '#888', marginTop: 2 },
-  profileBannerSwitch: { fontSize: 12, color: '#6C5CE7', marginTop: 6, fontWeight: '500' },
+  tileName: {
+    fontWeight: '800',
+    color: '#2A2F38',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  tileSub: {
+    color: '#636A74',
+    marginTop: 4,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  badge: {
+    backgroundColor: '#EAE4D8',
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#D3C8B4',
+  },
+  badgeText: { fontSize: 10, fontWeight: '800', color: '#776241' },
+  tileIcon: {
+    fontSize: 22,
+    marginBottom: 10,
+    color: '#8E7653',
+  },
+  footerCard: {
+    marginTop: 4,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DBD3C3',
+    backgroundColor: '#FBF8F2',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  footerText: {
+    fontSize: 12,
+    lineHeight: 20,
+    color: '#4D4D57',
+    textAlign: 'left',
+  },
 });

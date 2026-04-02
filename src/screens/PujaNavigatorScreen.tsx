@@ -7,15 +7,15 @@ import {
   StyleSheet,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/AppNavigator';
-import pujaData from '../data/pujaData';
+import type { RootStackParamList } from '../navigation/types';
+import { getPujaParts } from '../services/PujaService';
 import type { PujaStep } from '../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PujaNavigator'>;
 
 export default function PujaNavigatorScreen({ route, navigation }: Props) {
   const { partId } = route.params;
-  const part = pujaData.parts.find((p) => p.id === partId);
+  const part = getPujaParts().find((p) => p.id === partId);
 
   if (!part) return <Text>Part not found</Text>;
 
@@ -49,9 +49,9 @@ export default function PujaNavigatorScreen({ route, navigation }: Props) {
   );
 
   // Navigation to next/prev part
-  const partIndex = pujaData.parts.findIndex((p) => p.id === partId);
-  const nextPart = pujaData.parts[partIndex + 1];
-  const prevPart = pujaData.parts[partIndex - 1];
+  const partIndex = getPujaParts().findIndex((p) => p.id === partId);
+  const nextPart = getPujaParts()[partIndex + 1];
+  const prevPart = getPujaParts()[partIndex - 1];
 
   return (
     <View style={styles.container}>
@@ -74,7 +74,7 @@ export default function PujaNavigatorScreen({ route, navigation }: Props) {
             style={styles.navBtn}
             onPress={() => navigation.replace('PujaNavigator', { partId: prevPart.id })}
           >
-            <Text style={styles.navBtnText}>‹ Part {prevPart.id}</Text>
+            <Text style={styles.navBtnText}>‹ {prevPart.id === 'A' ? 'Aarambh' : prevPart.id === 'B' ? 'Archana' : 'Visarjan'}</Text>
           </TouchableOpacity>
         ) : (
           <View />
@@ -84,14 +84,14 @@ export default function PujaNavigatorScreen({ route, navigation }: Props) {
             style={[styles.navBtn, { backgroundColor: '#6C5CE7' }]}
             onPress={() => navigation.replace('PujaNavigator', { partId: nextPart.id })}
           >
-            <Text style={[styles.navBtnText, { color: '#fff' }]}>Part {nextPart.id} ›</Text>
+            <Text style={[styles.navBtnText, { color: '#fff' }]}>{nextPart.id === 'A' ? 'Aarambh' : nextPart.id === 'B' ? 'Archana' : 'Visarjan'} ›</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
             style={[styles.navBtn, { backgroundColor: '#4A3F8A' }]}
             onPress={() => navigation.navigate('Home')}
           >
-            <Text style={[styles.navBtnText, { color: '#fff' }]}>Complete</Text>
+            <Text style={[styles.navBtnText, { color: '#fff' }]}>Puza Sampann 🙏</Text>
           </TouchableOpacity>
         )}
       </View>

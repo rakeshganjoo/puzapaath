@@ -17,7 +17,7 @@ interface Props {
   audioId?: string;
 }
 
-const SPEED_OPTIONS = [0.5, 0.75, 1.0];
+const SPEED_OPTIONS = [1.0, 1.25, 1.5];
 
 export default function MantraDisplay({ mantra, script, size = 'normal', audioId }: Props) {
   const isSmall = size === 'small';

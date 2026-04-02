@@ -1,9 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { get, set, remove, getJSON, setJSON } from './StorageService';
 
 export interface UserProfile {
   id: string;
   personName: string;
   gotra: string;
+  englishBirthday?: string; // ISO date string YYYY-MM-DD
   lunarMonth: string;
   paksha: 'krishna' | 'shukla';
   tithi: string;
@@ -14,10 +15,17 @@ export interface UserProfile {
 
 const PROFILES_KEY = 'puzapaath_profiles';
 const ACTIVE_PROFILE_KEY = 'puzapaath_active_profile';
+const activeProfileListeners = new Set<(profile: UserProfile | null) => void>();
+
+async function notifyActiveProfileListeners(profileOverride?: UserProfile | null): Promise<void> {
+  const profile = profileOverride !== undefined ? profileOverride : await getActiveProfile();
+  for (const listener of activeProfileListeners) {
+    listener(profile);
+  }
+}
 
 export async function getProfiles(): Promise<UserProfile[]> {
-  const json = await AsyncStorage.getItem(PROFILES_KEY);
-  return json ? JSON.parse(json) : [];
+  return (await getJSON<UserProfile[]>(PROFILES_KEY)) ?? [];
 }
 
 export async function saveProfile(profile: UserProfile): Promise<void> {
@@ -28,33 +36,32 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
   } else {
     profiles.push({ ...profile, lastUsedAt: new Date().toISOString() });
   }
-  await AsyncStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+  await setJSON(PROFILES_KEY, profiles);
 }
 
 export async function deleteProfile(id: string): Promise<void> {
   const profiles = await getProfiles();
-  await AsyncStorage.setItem(
-    PROFILES_KEY,
-    JSON.stringify(profiles.filter((p) => p.id !== id))
-  );
+  await setJSON(PROFILES_KEY, profiles.filter((p) => p.id !== id));
   const activeId = await getActiveProfileId();
   if (activeId === id) {
-    await AsyncStorage.removeItem(ACTIVE_PROFILE_KEY);
+    await remove(ACTIVE_PROFILE_KEY);
+    await notifyActiveProfileListeners(null);
   }
 }
 
 export async function setActiveProfile(id: string): Promise<void> {
-  await AsyncStorage.setItem(ACTIVE_PROFILE_KEY, id);
+  await set(ACTIVE_PROFILE_KEY, id);
   // Update lastUsedAt
   const profiles = await getProfiles();
   const profile = profiles.find((p) => p.id === id);
   if (profile) {
     await saveProfile(profile);
   }
+  await notifyActiveProfileListeners(profile ?? null);
 }
 
 export async function getActiveProfileId(): Promise<string | null> {
-  return AsyncStorage.getItem(ACTIVE_PROFILE_KEY);
+  return get(ACTIVE_PROFILE_KEY);
 }
 
 export async function getActiveProfile(): Promise<UserProfile | null> {
@@ -66,4 +73,12 @@ export async function getActiveProfile(): Promise<UserProfile | null> {
 
 export function generateProfileId(): string {
   return `profile_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function subscribeActiveProfile(listener: (profile: UserProfile | null) => void): () => void {
+  activeProfileListeners.add(listener);
+  getActiveProfile().then((profile) => listener(profile));
+  return () => {
+    activeProfileListeners.delete(listener);
+  };
 }

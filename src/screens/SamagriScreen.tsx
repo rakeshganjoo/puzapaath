@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,10 @@ import {
   SectionList,
   StyleSheet,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/AppNavigator';
-import pujaData from '../data/pujaData';
+import type { RootStackParamList } from '../navigation/types';
+import { getSamagriList } from '../services/PujaService';
+import { getJSON, setJSON } from '../services/StorageService';
 import type { SamagriItem } from '../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Samagri'>;
@@ -23,24 +23,37 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_ORDER = ['essential', 'panchdashang', 'food', 'optional'];
 
+const CHECKED_STORAGE_KEY = 'samagri_checked_items_v1';
+
 export default function SamagriScreen({ navigation }: Props) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
+
+  // Load persisted checked state on mount
+  useEffect(() => {
+    getJSON<string[]>(CHECKED_STORAGE_KEY).then((ids: string[] | null) => {
+      if (ids?.length) setChecked(new Set(ids));
+    });
+  }, []);
 
   const toggle = useCallback((id: string) => {
     setChecked((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      // Persist after every toggle (fire-and-forget)
+      setJSON(CHECKED_STORAGE_KEY, [...next]).catch(() => {});
       return next;
     });
   }, []);
 
+  const samagriItems = getSamagriList();
+
   const sections = CATEGORY_ORDER.map((cat) => ({
     title: CATEGORY_LABELS[cat],
-    data: pujaData.samagri.filter((s) => s.category === cat),
+    data: samagriItems.filter((s) => s.category === cat),
   })).filter((s) => s.data.length > 0);
 
-  const totalItems = pujaData.samagri.length;
+  const totalItems = samagriItems.length;
   const checkedCount = checked.size;
 
   return (
