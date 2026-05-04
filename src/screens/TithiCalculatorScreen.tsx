@@ -32,34 +32,32 @@ function daysInMonth(y: number, m: number): number {
   return new Date(y, m, 0).getDate();
 }
 
-/** Find nearest occurrence of this tithi (searches current year and ±1 year) */
-function findThisYearOccurrence(
+/** Find the next upcoming occurrence of this tithi (today or future, up to 2 years ahead) */
+function findNextOccurrence(
   targetMonth: string,
   targetPaksha: 'shukla' | 'krishna',
   targetTithiNum: number,
-) {
+): Date | null {
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const curYear = today.getFullYear();
-  // Search previous year, current year, and next year to find nearest occurrence
-  const candidates: Date[] = [];
-  for (let yr = curYear - 1; yr <= curYear + 1; yr++) {
+  // Search current year and next two years for next upcoming date
+  for (let yr = curYear; yr <= curYear + 2; yr++) {
     for (let m = 1; m <= 12; m++) {
       const days = getMonthCalendar(yr, m);
       for (const d of days) {
         if (
           d.lunarMonth === targetMonth &&
           d.paksha === targetPaksha &&
-          d.tithiNum === targetTithiNum
+          d.tithiNum === targetTithiNum &&
+          d.date >= today
         ) {
-          candidates.push(d.date);
+          return d.date;
         }
       }
     }
   }
-  if (candidates.length === 0) return null;
-  // Return the nearest past or future occurrence to today
-  candidates.sort((a, b) => Math.abs(a.getTime() - today.getTime()) - Math.abs(b.getTime() - today.getTime()));
-  return candidates[0];
+  return null;
 }
 
 export default function TithiCalculatorScreen({ navigation }: Props) {
@@ -297,16 +295,16 @@ export default function TithiCalculatorScreen({ navigation }: Props) {
           </Text>
 
           {(() => {
-            const occ = findThisYearOccurrence(result.lunarMonth, result.paksha, result.tithiNum);
+            const occ = findNextOccurrence(result.lunarMonth, result.paksha, result.tithiNum);
             if (!occ) return null;
             const occYear = occ.getFullYear();
             const occMonth = MONTH_NAMES[occ.getMonth() + 1];
             const occDay = occ.getDate();
             const curYear = new Date().getFullYear();
-            if (occYear !== curYear) return null;
+            const label = occYear === curYear ? '📅 Next occurrence this year on' : `📅 Next occurrence on`;
             return (
               <View style={styles.thisYearBox}>
-                <Text style={styles.thisYearLabel}>📅 Appears this year on</Text>
+                <Text style={styles.thisYearLabel}>{label}</Text>
                 <Text style={styles.thisYearValue}>{occMonth} {occDay}, {occYear}</Text>
               </View>
             );
