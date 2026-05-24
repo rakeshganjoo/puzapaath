@@ -57,6 +57,12 @@
     "plugins": [
       "expo-audio",
       "expo-notifications"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c7b16e62-985e-4a4f-89e5-400803b7d8d3"
+      }
+    },
+    "owner": "janthari"
   }
 }
