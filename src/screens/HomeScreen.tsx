@@ -223,9 +223,14 @@ export default function HomeScreen({ navigation }: Props) {
                   <Text style={[st.authLabel, st.authLabelSignedOut]}>Not Signed In</Text>
                   <Text style={st.authHint}>Sign in to save Takni and Events.</Text>
                 </View>
-                <TouchableOpacity style={st.signinBtn} onPress={signInWithGoogle}>
-                  <Text style={st.signinText}>Sign In</Text>
-                </TouchableOpacity>
+                <View style={st.authGuestActions}>
+                  <TouchableOpacity style={st.setupBtn} onPress={() => navigation.navigate('Setup')}>
+                    <Text style={st.setupBtnText}>Setup Profile</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={st.signinBtn} onPress={signInWithGoogle}>
+                    <Text style={st.signinText}>Sign In</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           )}
@@ -388,12 +393,26 @@ const st = StyleSheet.create({
   authProfileName: { fontWeight: '700' },
   authHint: { fontSize: 11, color: '#E65100', marginTop: 2 },
   authLabelSignedOut: { color: '#E65100' },
+  authGuestActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  setupBtn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#FFB74D',
+    marginRight: 8,
+  },
+  setupBtnText: { color: '#E65100', fontSize: 12, fontWeight: '700' },
   signinBtn: {
     backgroundColor: '#FF9800',
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    marginLeft: 10,
   },
   signinText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   logoutBtn: {
