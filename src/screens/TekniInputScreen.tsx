@@ -3,7 +3,7 @@
  * Follows the same pattern as MuhuratInputScreen.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   ActivityIndicator, Alert, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
@@ -11,6 +11,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { CITIES } from '../data/cities';
+import { getSavedTekni, hydrateSavedTeknis, refreshSavedTekniProfileScope } from '../services/SavedTekniService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TekniInput'>;
 
@@ -48,7 +49,7 @@ function TimeFields({ h, min, onH, onMin }: {
   );
 }
 
-export default function TekniInputScreen({ navigation }: Props) {
+export default function TekniInputScreen({ navigation, route }: Props) {
   // Person details
   const [name, setName] = useState('');
   const [fatherName, setFatherName] = useState('');
@@ -79,6 +80,7 @@ export default function TekniInputScreen({ navigation }: Props) {
   const [showRashiInput, setShowRashiInput] = useState(false);
   const [userLagna, setUserLagna] = useState(0); // 0 = auto
   const [userMoon, setUserMoon] = useState(0);
+  const [savedTekniName, setSavedTekniName] = useState('');
 
   const RASHIS = [
     'Mesha', 'Vrishabha', 'Mithuna', 'Karka', 'Simha', 'Kanya',
@@ -87,6 +89,45 @@ export default function TekniInputScreen({ navigation }: Props) {
 
   const isValid = name.trim().length > 0 && dobY.length === 4 && dobM.length >= 1 && dobD.length >= 1 && tobH.length >= 1 && tobMin.length >= 1
     && (!isOtherCity || (otherCityName.trim().length > 0 && otherLat.length > 0 && otherLng.length > 0));
+
+  useEffect(() => {
+    async function loadSavedTekni() {
+      if (!route.params?.savedTekniId) return;
+      await hydrateSavedTeknis();
+      await refreshSavedTekniProfileScope();
+      const record = getSavedTekni(route.params.savedTekniId);
+      if (!record) return;
+
+      const birth = record.birth;
+      setSavedTekniName(record.name);
+      setName(birth.name);
+      setFatherName(birth.fatherName);
+      setMotherName(birth.motherName);
+      setGotra(birth.gotra);
+      setIshtdevi(birth.ishtdevi);
+      setGender(birth.gender);
+      setDobY(String(birth.year));
+      setDobM(String(birth.month));
+      setDobD(String(birth.day));
+      setTobH(String(birth.hour));
+      setTobMin(String(birth.minute));
+
+      const matchingCityIndex = CITIES.findIndex(
+        (city) => city.label === birth.placeName && city.lat === birth.latitude && city.lng === birth.longitude,
+      );
+      if (matchingCityIndex >= 0) {
+        setSelectedCity(matchingCityIndex);
+        setIsOtherCity(false);
+      } else {
+        setIsOtherCity(true);
+        setOtherCityName(birth.placeName);
+        setOtherLat(String(birth.latitude));
+        setOtherLng(String(birth.longitude));
+      }
+    }
+
+    loadSavedTekni().catch(() => {});
+  }, [route.params?.savedTekniId]);
 
   // Geocode a place name using OpenStreetMap Nominatim (free, no API key)
   const geocodePlace = useCallback(async (place: string) => {
@@ -140,6 +181,8 @@ export default function TekniInputScreen({ navigation }: Props) {
       longitude,
       ...(userLagna > 0 ? { userLagnaRashi: userLagna } : {}),
       ...(userMoon > 0 ? { userMoonRashi: userMoon } : {}),
+      ...(route.params?.savedTekniId ? { savedTekniId: route.params.savedTekniId } : {}),
+      suggestedSaveName: savedTekniName || name.trim(),
     });
   };
 
@@ -147,6 +190,17 @@ export default function TekniInputScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={st.scroll} contentContainerStyle={st.scrollContent}>
+      <TouchableOpacity style={st.libraryBtn} onPress={() => navigation.navigate('TekniLibrary')}>
+        <Text style={st.libraryBtnText}>📚 My Teknis</Text>
+      </TouchableOpacity>
+
+      {route.params?.savedTekniId && !!savedTekniName && (
+        <View style={st.editingCard}>
+          <Text style={st.editingTitle}>Editing saved Tekni</Text>
+          <Text style={st.editingName}>{savedTekniName}</Text>
+        </View>
+      )}
+
       {/* ── Section: Personal Details ── */}
       <View style={st.section}>
         <Text style={st.sectionTitle}>👤  Personal Details / व्यक्तिगत विवरण</Text>
@@ -330,7 +384,7 @@ export default function TekniInputScreen({ navigation }: Props) {
         disabled={!isValid}
         activeOpacity={0.8}
       >
-        <Text style={st.generateBtnText}>🔮  Generate Takni / टेकनी बनायें</Text>
+        <Text style={st.generateBtnText}>{route.params?.savedTekniId ? '🔄  Regenerate Saved Tekni' : '🔮  Generate Takni / टेकनी बनायें'}</Text>
       </TouchableOpacity>
 
       <Text style={st.footerNote}>
@@ -427,6 +481,25 @@ export default function TekniInputScreen({ navigation }: Props) {
 const st = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: '#F5F0E8' },
   scrollContent: { padding: 20, paddingBottom: 40, maxWidth: 600, alignSelf: 'center' as const, width: '100%' as any },
+  libraryBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#EEE8FF',
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  libraryBtnText: { color: '#4F46C6', fontWeight: '700', fontSize: 13 },
+  editingCard: {
+    backgroundColor: '#FFF9F0',
+    borderColor: '#E8DCC8',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  editingTitle: { fontSize: 12, color: '#8B6A45', fontWeight: '700' },
+  editingName: { fontSize: 16, color: '#2D2D3A', fontWeight: '800', marginTop: 4 },
   section: {
     backgroundColor: '#fff',
     borderRadius: 12, padding: 16, marginBottom: 14,

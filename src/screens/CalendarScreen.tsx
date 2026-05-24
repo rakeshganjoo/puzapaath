@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  Share,
   useWindowDimensions,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -22,7 +23,11 @@ import {
   LUNAR_MONTHS_LIST, TYPE_EMOJI,
   type SavedEvent, type EventType,
 } from '../services/SavedEventsService';
+import { createGuestProfileFromAuth } from '../services/ProfileService';
 import { useCalendar } from '../contexts/CalendarContext';
+import { useAuth } from '../contexts/AuthContext';
+import { getValidIdToken } from '../services/AuthService';
+import { getSyncSettings } from '../services/CloudSyncService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Calendar'>;
 
@@ -74,6 +79,85 @@ function getSamvatDetails(date: Date) {
   };
 }
 
+// ── ICS / Calendar export helpers ──────────────────────────────────────────
+
+function icsDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}${m}${d}`;
+}
+
+/** Find the next Gregorian date that matches each event's lunar position. */
+function findGregorianDatesForEvents(events: SavedEvent[]): Map<string, Date> {
+  const result = new Map<string, Date>();
+  const today = new Date();
+  const curYear = today.getFullYear();
+  for (let yearOffset = 0; yearOffset <= 1; yearOffset++) {
+    for (let mon = 1; mon <= 12; mon++) {
+      const days = getMonthCalendar(curYear + yearOffset, mon);
+      for (const day of days) {
+        for (const evt of events) {
+          if (!result.has(evt.id) &&
+              day.lunarMonth === evt.lunarMonth &&
+              day.paksha === evt.paksha &&
+              day.tithiNum === evt.tithiNum) {
+            result.set(evt.id, day.date);
+          }
+        }
+      }
+    }
+    if (events.every(e => result.has(e.id))) break;
+  }
+  return result;
+}
+
+/** Build a .ics string for the given events. */
+function generateICS(events: SavedEvent[], gregorianDates: Map<string, Date>): string {
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Janthari//Hindu Calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:Janthari Events',
+  ];
+  for (const evt of events) {
+    const date = gregorianDates.get(evt.id);
+    if (!date) continue;
+    const summary = `${evt.emoji ?? ''} ${evt.name}`.trim();
+    const desc = `Lunar: ${evt.lunarMonth} - ${evt.paksha === 'shukla' ? 'Shukla' : 'Krishna'} Paksha - Tithi ${evt.tithiNum}`;
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${evt.id}@janthari.com`,
+      `DTSTART;VALUE=DATE:${icsDateString(date)}`,
+      `SUMMARY:${summary}`,
+      `DESCRIPTION:${desc}`,
+      'RRULE:FREQ=YEARLY',
+      'STATUS:CONFIRMED',
+      'TRANSP:TRANSPARENT',
+      'END:VEVENT',
+    );
+  }
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
+/** Trigger .ics download on web. */
+function downloadICSWeb(icsContent: string, filename: string) {
+  const doc = (globalThis as { document?: Document }).document;
+  if (!doc) return;
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = doc.createElement('a');
+  a.href = url;
+  a.download = filename;
+  doc.body.appendChild(a);
+  a.click();
+  doc.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 /** Moon phase emoji from tithi number + paksha */
 function moonPhaseEmoji(tithiNum: number, paksha: 'shukla' | 'krishna'): string {
   if (paksha === 'shukla') {
@@ -98,7 +182,7 @@ const EVENT_TYPES: { type: EventType; label: string }[] = [
   { type: 'custom', label: '⭐ Custom' },
 ];
 
-export default function CalendarScreen({ navigation }: Props) {
+export default function CalendarScreen({ navigation, route }: Props) {
   const today = useMemo(() => new Date(), []);
   const todayYear = today.getFullYear();
   const todayMonth = today.getMonth() + 1;
@@ -116,14 +200,24 @@ export default function CalendarScreen({ navigation }: Props) {
 
   // Saved personal events — owned by CalendarContext (hydrated on app start)
   const { userEvents: savedEvents, addUserEvent, deleteUserEvent } = useCalendar();
+  const { user, isAuthenticated, signInWithGoogle } = useAuth();
 
   // Add Event modal state
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAllEventsModal, setShowAllEventsModal] = useState(false);
+  const [sharingEventId, setSharingEventId] = useState<string | null>(null);
+  const [isSharingBulk, setIsSharingBulk] = useState(false);
+  const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
+  const [shareResultModal, setShareResultModal] = useState<{ title: string; url: string; icsContent: string } | null>(null);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<EventType>('birthday');
   const [newLunarMonth, setNewLunarMonth] = useState(LUNAR_MONTHS_LIST[0]);
   const [newPaksha, setNewPaksha] = useState<'shukla' | 'krishna'>('shukla');
   const [newTithi, setNewTithi] = useState(1);
+
+  const allSavedEvents = useMemo(() => {
+    return [...savedEvents].sort((a, b) => b.createdAt - a.createdAt);
+  }, [savedEvents]);
 
   const blurFocusedElement = useCallback(() => {
     if (Platform.OS !== 'web') return;
@@ -140,8 +234,10 @@ export default function CalendarScreen({ navigation }: Props) {
     setShowAddModal(true);
   }, []);
 
-  const handleSaveEvent = useCallback(() => {
+  const handleSaveEvent = useCallback(async () => {
     if (!newName.trim()) return;
+    
+    // Try to save with current profile
     const saved = addUserEvent({
       name: newName.trim(),
       type: newType,
@@ -150,16 +246,171 @@ export default function CalendarScreen({ navigation }: Props) {
       tithiNum: newTithi,
       emoji: TYPE_EMOJI[newType],
     });
-    if (!saved) {
-      Alert.alert('Profile Required', 'Select or create a profile in Setup before saving personal calendar events.');
+    
+    if (saved) {
+      setShowAddModal(false);
       return;
     }
-    setShowAddModal(false);
-  }, [newName, newType, newLunarMonth, newPaksha, newTithi, addUserEvent]);
+    
+    // Save failed — no active profile. Offer to login or create guest profile.
+    if (isAuthenticated && user) {
+      // User is already authenticated — auto-create profile from auth data
+      try {
+        await createGuestProfileFromAuth(user.email, user.name);
+        // Add small delay to ensure profile is set in context
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Retry save with new profile
+        const retrySaved = addUserEvent({
+          name: newName.trim(),
+          type: newType,
+          lunarMonth: newLunarMonth,
+          paksha: newPaksha,
+          tithiNum: newTithi,
+          emoji: TYPE_EMOJI[newType],
+        });
+        if (retrySaved) {
+          setShowAddModal(false);
+          Alert.alert('Success', 'Event saved to your calendar!');
+        } else {
+          Alert.alert('Error', 'Failed to save event. Please try again.');
+        }
+      } catch (error) {
+        Alert.alert('Error', `Failed to create profile: ${error}`);
+      }
+    } else {
+      // Not authenticated — prompt to sign in
+      Alert.alert(
+        'Sign In to Save',
+        'Sign in with Google to save personal events to your calendar.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Sign In',
+            onPress: async () => {
+              try {
+                await signInWithGoogle();
+                // After login, user will be redirected back and auth will update
+                // Just close this modal and let them retry
+                setShowAddModal(false);
+                Alert.alert('Success', 'Signed in! Please add your event again.');
+              } catch (error) {
+                Alert.alert('Error', `Failed to sign in: ${error}`);
+              }
+            },
+          },
+        ]
+      );
+    }
+  }, [newName, newType, newLunarMonth, newPaksha, newTithi, addUserEvent, isAuthenticated, user, signInWithGoogle]);
 
   const handleDeleteEvent = useCallback((id: string) => {
     deleteUserEvent(id);
   }, [deleteUserEvent]);
+
+  const handleShareEvent = useCallback(async (evt: SavedEvent) => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in with Google to share events.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => { signInWithGoogle().catch(() => {}); } },
+        ],
+      );
+      return;
+    }
+
+    try {
+      setSharingEventId(evt.id);
+
+      const idToken = await getValidIdToken();
+      if (!idToken) {
+        Alert.alert('Session Expired', 'Please sign in again.');
+        return;
+      }
+
+      const settings = await getSyncSettings();
+      const response = await fetch(`${settings.endpoint}/v1/events/share`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          event: {
+            name: evt.name,
+            type: evt.type,
+            lunarMonth: evt.lunarMonth,
+            paksha: evt.paksha,
+            tithiNum: evt.tithiNum,
+            emoji: evt.emoji,
+            notes: evt.notes,
+          },
+        }),
+      });
+
+      const data = (await response.json()) as { ok?: boolean; message?: string; shareUrl?: string };
+      if (!response.ok || !data?.shareUrl) {
+        throw new Error(data?.message || `Share failed (HTTP ${response.status})`);
+      }
+
+      const gregorianDates = findGregorianDatesForEvents([evt]);
+      const icsContent = generateICS([evt], gregorianDates);
+      setShareResultModal({ title: evt.name, url: data.shareUrl, icsContent });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unable to share event right now.';
+      Alert.alert('Share Failed', msg);
+    } finally {
+      setSharingEventId(null);
+    }
+  }, [isAuthenticated, signInWithGoogle]);
+
+  const handleShareSelected = useCallback(async () => {
+    const eventsToShare = allSavedEvents.filter(e => selectedEventIds.has(e.id));
+    if (eventsToShare.length === 0) return;
+
+    setIsSharingBulk(true);
+    try {
+      const gregorianDates = findGregorianDatesForEvents(eventsToShare);
+      const icsContent = generateICS(eventsToShare, gregorianDates);
+
+      // For a single event, also fetch a share URL from the worker
+      let shareUrl = '';
+      if (eventsToShare.length === 1 && isAuthenticated) {
+        try {
+          const idToken = await getValidIdToken();
+          if (idToken) {
+            const settings = await getSyncSettings();
+            const resp = await fetch(`${settings.endpoint}/v1/events/share`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+              body: JSON.stringify({
+                event: {
+                  name: eventsToShare[0].name,
+                  type: eventsToShare[0].type,
+                  lunarMonth: eventsToShare[0].lunarMonth,
+                  paksha: eventsToShare[0].paksha,
+                  tithiNum: eventsToShare[0].tithiNum,
+                  emoji: eventsToShare[0].emoji,
+                  notes: eventsToShare[0].notes,
+                },
+              }),
+            });
+            const d = (await resp.json()) as { shareUrl?: string };
+            shareUrl = d?.shareUrl ?? '';
+          }
+        } catch { /* share URL is optional */ }
+      }
+
+      const title = eventsToShare.length === 1
+        ? eventsToShare[0].name
+        : `${eventsToShare.length} Events`;
+      setShareResultModal({ title, url: shareUrl, icsContent });
+    } finally {
+      setIsSharingBulk(false);
+    }
+  }, [allSavedEvents, selectedEventIds, isAuthenticated]);
 
   const days = useMemo(() => getMonthCalendar(year, month), [year, month]);
   const firstDow = days.length > 0 ? days[0].date.getDay() : 0;
@@ -185,6 +436,12 @@ export default function CalendarScreen({ navigation }: Props) {
     blurFocusedElement();
     setZoomDay(null);
   }, [blurFocusedElement]);
+
+  useEffect(() => {
+    if (route.params?.openAllEvents) {
+      setShowAllEventsModal(true);
+    }
+  }, [route.params?.openAllEvents]);
 
   const handleDayPress = useCallback((day: CalendarDay) => {
     setSelectedDay(day);
@@ -303,6 +560,14 @@ export default function CalendarScreen({ navigation }: Props) {
           <Text style={styles.addEventBtnText}>＋</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={styles.topMyEventsBtn}
+        onPress={() => setShowAllEventsModal(true)}
+        activeOpacity={0.78}
+      >
+        <Text style={styles.topMyEventsBtnText}>📚 My Events ({savedEvents.length})</Text>
+      </TouchableOpacity>
 
       {/* Weekday headers */}
       <View style={styles.weekRow}>
@@ -655,11 +920,28 @@ export default function CalendarScreen({ navigation }: Props) {
                     <TouchableOpacity onPress={() => handleDeleteEvent(evt.id)} style={styles.deleteBtn}>
                       <Text style={styles.deleteBtnText}>✕</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleShareEvent(evt)}
+                      style={styles.shareBtn}
+                      disabled={sharingEventId === evt.id}
+                    >
+                      <Text style={styles.shareBtnText}>{sharingEventId === evt.id ? '...' : '↗'}</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               );
             })}
           </>
+        )}
+
+        {savedEvents.length > 0 && (
+          <TouchableOpacity
+            style={styles.allEventsBtn}
+            onPress={() => setShowAllEventsModal(true)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.allEventsBtnText}>📚 View All My Events ({savedEvents.length})</Text>
+          </TouchableOpacity>
         )}
 
         {/* Add Event prompt */}
@@ -842,13 +1124,190 @@ export default function CalendarScreen({ navigation }: Props) {
                 <Text style={styles.modalCancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSaveBtn, !newName.trim() && { opacity: 0.4 }]}
-                onPress={handleSaveEvent}
-                disabled={!newName.trim()}
+                style={[styles.modalSaveBtn, !newName.trim() && { opacity: 0.5 }]}
+                onPress={() => {
+                  if (newName.trim()) {
+                    handleSaveEvent();
+                  }
+                }}
+                activeOpacity={newName.trim() ? 0.7 : 0.5}
               >
                 <Text style={styles.modalSaveBtnText}>Save Event</Text>
               </TouchableOpacity>
             </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── All Events Modal ── */}
+      <Modal
+        visible={showAllEventsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setShowAllEventsModal(false); setSelectedEventIds(new Set()); }}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setShowAllEventsModal(false); setSelectedEventIds(new Set()); }}>
+          <TouchableOpacity style={styles.modalSheet} activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>All My Events</Text>
+
+            {allSavedEvents.length > 0 && (
+              <View style={styles.selectActionsRow}>
+                <TouchableOpacity onPress={() => {
+                  if (selectedEventIds.size === allSavedEvents.length) {
+                    setSelectedEventIds(new Set());
+                  } else {
+                    setSelectedEventIds(new Set(allSavedEvents.map(e => e.id)));
+                  }
+                }}>
+                  <Text style={styles.selectAllText}>
+                    {selectedEventIds.size === allSavedEvents.length ? 'Clear All' : 'Select All'}
+                  </Text>
+                </TouchableOpacity>
+                {selectedEventIds.size > 0 && (
+                  <TouchableOpacity
+                    style={styles.shareSelectedBtn}
+                    onPress={handleShareSelected}
+                    disabled={isSharingBulk}
+                  >
+                    <Text style={styles.shareSelectedBtnText}>
+                      {isSharingBulk ? 'Preparing...' : `Share / Export (${selectedEventIds.size})`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator>
+              {allSavedEvents.length === 0 && (
+                <Text style={styles.modalHint}>No saved events yet.</Text>
+              )}
+
+              {allSavedEvents.map((evt) => {
+                const isSelected = selectedEventIds.has(evt.id);
+                return (
+                  <TouchableOpacity
+                    key={evt.id}
+                    style={[styles.allEventRow, isSelected && styles.allEventRowSelected]}
+                    onPress={() => {
+                      setSelectedEventIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(evt.id)) next.delete(evt.id); else next.add(evt.id);
+                        return next;
+                      });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.checkbox}>
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.allEventTitle}>{TYPE_EMOJI[evt.type]} {evt.name}</Text>
+                      <Text style={styles.allEventMeta}>
+                        {evt.lunarMonth} · {evt.paksha === 'shukla' ? 'Shukla' : 'Krishna'} · Tithi {evt.tithiNum}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.shareMiniBtn}
+                      onPress={(e) => { e.stopPropagation?.(); handleShareEvent(evt); }}
+                      disabled={sharingEventId === evt.id}
+                    >
+                      <Text style={styles.shareMiniBtnText}>{sharingEventId === evt.id ? '...' : '↗ Share'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteMiniBtn}
+                      onPress={(e) => { e.stopPropagation?.(); handleDeleteEvent(evt.id); }}
+                    >
+                      <Text style={styles.deleteMiniBtnText}>✕</Text>
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { setShowAllEventsModal(false); setSelectedEventIds(new Set()); }}>
+                <Text style={styles.modalCancelBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Share Result Modal ── */}
+      <Modal
+        visible={shareResultModal !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShareResultModal(null)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShareResultModal(null)}>
+          <TouchableOpacity style={[styles.modalSheet, { paddingBottom: 24 }]} activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>Share: {shareResultModal?.title}</Text>
+
+            {/* Download .ics — works on all platforms */}
+            <TouchableOpacity
+              style={styles.icsDownloadBtn}
+              onPress={() => {
+                if (!shareResultModal) return;
+                if (Platform.OS === 'web') {
+                  downloadICSWeb(shareResultModal.icsContent, `janthari-${shareResultModal.title.replace(/\s+/g, '-').toLowerCase()}.ics`);
+                } else {
+                  Share.share({
+                    message: shareResultModal.icsContent,
+                    title: shareResultModal.title,
+                  }).catch(() => {});
+                }
+              }}
+            >
+              <Text style={styles.icsDownloadBtnText}>📅 Add to Calendar (.ics)</Text>
+              <Text style={styles.icsDownloadBtnSub}>Opens in Google Calendar, Apple Calendar, Outlook & more</Text>
+            </TouchableOpacity>
+
+            {/* Share URL (if available) */}
+            {!!shareResultModal?.url && (
+              <View style={styles.shareUrlBlock}>
+                <Text style={styles.shareUrlLabel}>🔗 Janthari Link (30-day public link)</Text>
+                <Text style={styles.shareUrlText} selectable numberOfLines={2}>{shareResultModal.url}</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <TouchableOpacity
+                    style={styles.copyLinkBtn}
+                    onPress={() => {
+                      const url = shareResultModal?.url;
+                      if (!url) return;
+                      if (Platform.OS === 'web') {
+                        const nav = (globalThis as { navigator?: Navigator }).navigator as Navigator & { clipboard?: { writeText?: (s: string) => Promise<void> } } | undefined;
+                        nav?.clipboard?.writeText?.(url)
+                          .then(() => Alert.alert('Copied', 'Link copied to clipboard!'))
+                          .catch(() => Alert.alert('Copy manually', url));
+                      } else {
+                        Share.share({ message: url, url }).catch(() => {});
+                      }
+                    }}
+                  >
+                    <Text style={styles.copyLinkBtnText}>Copy Link</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.copyLinkBtn}
+                    onPress={() => {
+                      const url = shareResultModal?.url;
+                      if (!url) return;
+                      const nav = (globalThis as { navigator?: unknown }).navigator as { share?: (data: { url: string; title: string }) => Promise<void> } | undefined;
+                      if (nav?.share) {
+                        nav.share({ url, title: shareResultModal?.title ?? 'Janthari Event' }).catch(() => {});
+                      } else {
+                        Share.share({ message: url, url }).catch(() => {});
+                      }
+                    }}
+                  >
+                    <Text style={styles.copyLinkBtnText}>Share via...</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            <TouchableOpacity style={[styles.modalCancelBtn, { marginTop: 16, alignSelf: 'center' }]} onPress={() => setShareResultModal(null)}>
+              <Text style={styles.modalCancelBtnText}>Done</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -1168,6 +1627,21 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   addEventBtnText: { color: '#fff', fontSize: 22, lineHeight: 26, fontWeight: '300' },
+  topMyEventsBtn: {
+    backgroundColor: '#EDF7FF',
+    borderWidth: 1,
+    borderColor: '#CFE6FF',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  topMyEventsBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1565C0',
+  },
 
   // User event line in cell
   userEventLine: { fontSize: 7, fontWeight: '700', color: '#E65100', marginTop: 1 },
@@ -1192,6 +1666,19 @@ const styles = StyleSheet.create({
   importantCardDates: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 3 },
   deleteBtn: { padding: 6, marginLeft: 8 },
   deleteBtnText: { color: 'rgba(255,255,255,0.7)', fontSize: 16, fontWeight: '700' },
+  shareBtn: { padding: 6, marginLeft: 4 },
+  shareBtnText: { color: 'rgba(255,255,255,0.86)', fontSize: 16, fontWeight: '700' },
+  allEventsBtn: {
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 6,
+    marginBottom: 8,
+    backgroundColor: '#F3F0FF',
+    borderWidth: 1,
+    borderColor: '#D9CEFF',
+    alignItems: 'center',
+  },
+  allEventsBtnText: { fontSize: 13, fontWeight: '700', color: '#5E35B1' },
   addEventCard: {
     borderRadius: 12, padding: 14, marginTop: 2,
     backgroundColor: '#F0EDFF',
@@ -1278,4 +1765,94 @@ const styles = StyleSheet.create({
     backgroundColor: '#6C5CE7',
   },
   modalSaveBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  allEventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EAEAEF',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  allEventTitle: { fontSize: 14, fontWeight: '700', color: '#2D2D3A' },
+  allEventMeta: { fontSize: 12, color: '#777', marginTop: 2 },
+  shareMiniBtn: {
+    backgroundColor: '#EAF4FF',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginLeft: 8,
+  },
+  shareMiniBtnText: { color: '#1565C0', fontWeight: '700', fontSize: 12 },
+  deleteMiniBtn: {
+    backgroundColor: '#FDECEC',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginLeft: 6,
+  },
+  deleteMiniBtnText: { color: '#C62828', fontWeight: '700', fontSize: 12 },
+
+  // Multi-select & share
+  selectActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  selectAllText: { color: '#6C5CE7', fontSize: 13, fontWeight: '600' },
+  shareSelectedBtn: {
+    backgroundColor: '#6C5CE7',
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+  },
+  shareSelectedBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  allEventRowSelected: {
+    borderColor: '#6C5CE7',
+    backgroundColor: '#F3F0FF',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#6C5CE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    backgroundColor: '#fff',
+  },
+  checkmark: { color: '#6C5CE7', fontSize: 13, fontWeight: '900' },
+
+  // Share result modal
+  icsDownloadBtn: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#A5D6A7',
+    alignItems: 'center',
+  },
+  icsDownloadBtnText: { color: '#2E7D32', fontSize: 16, fontWeight: '800' },
+  icsDownloadBtnSub: { color: '#4CAF50', fontSize: 12, marginTop: 4, textAlign: 'center' },
+  shareUrlBlock: {
+    backgroundColor: '#F8F8FF',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#DDD',
+  },
+  shareUrlLabel: { fontSize: 12, color: '#555', marginBottom: 6, fontWeight: '600' },
+  shareUrlText: { fontSize: 12, color: '#1565C0', fontFamily: 'monospace' },
+  copyLinkBtn: {
+    flex: 1,
+    backgroundColor: '#EAF4FF',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  copyLinkBtnText: { color: '#1565C0', fontWeight: '700', fontSize: 13 },
 });

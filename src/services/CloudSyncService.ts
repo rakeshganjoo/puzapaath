@@ -1,6 +1,14 @@
 import { getJSON, setJSON } from './StorageService';
 import { getActiveProfile, getProfiles, saveProfile, type UserProfile } from './ProfileService';
 import { getAllEventsForAllProfiles, importEvents, type SavedEvent } from './SavedEventsService';
+import {
+  getAllSavedTeknisForSync,
+  getAllSavedTekniTombstonesForSync,
+  hydrateSavedTeknis,
+  refreshSavedTekniProfileScope,
+  upsertImportedSavedTeknis,
+} from './SavedTekniService';
+import type { SyncedSavedTekniRecord, SyncedSavedTekniTombstone } from '../types/tekni';
 import { getCurrentUser, getValidIdToken } from './AuthService';
 
 const SYNC_SETTINGS_KEY = 'janthari_sync_settings_v1';
@@ -18,8 +26,12 @@ export interface SyncResult {
   ok: boolean;
   pushedProfiles: number;
   pushedEvents: number;
+  pushedTeknis: number;
+  pushedTekniTombstones: number;
   pulledProfiles: number;
   pulledEvents: number;
+  pulledTeknis: number;
+  pulledTekniTombstones: number;
   message: string;
 }
 
@@ -81,8 +93,12 @@ export async function syncNow(): Promise<SyncResult> {
       ok: false,
       pushedProfiles: 0,
       pushedEvents: 0,
+      pushedTeknis: 0,
+      pushedTekniTombstones: 0,
       pulledProfiles: 0,
       pulledEvents: 0,
+      pulledTeknis: 0,
+      pulledTekniTombstones: 0,
       message: 'Cloud sync is disabled',
     };
   }
@@ -94,8 +110,12 @@ export async function syncNow(): Promise<SyncResult> {
       ok: false,
       pushedProfiles: 0,
       pushedEvents: 0,
+      pushedTeknis: 0,
+      pushedTekniTombstones: 0,
       pulledProfiles: 0,
       pulledEvents: 0,
+      pulledTeknis: 0,
+      pulledTekniTombstones: 0,
       message: 'Sign in with Google before running cloud sync',
     };
   }
@@ -106,14 +126,22 @@ export async function syncNow(): Promise<SyncResult> {
       ok: false,
       pushedProfiles: 0,
       pushedEvents: 0,
+      pushedTeknis: 0,
+      pushedTekniTombstones: 0,
       pulledProfiles: 0,
       pulledEvents: 0,
+      pulledTeknis: 0,
+      pulledTekniTombstones: 0,
       message: 'Select a profile before running sync',
     };
   }
 
   const profiles = await getProfiles();
   const events = getAllEventsForAllProfiles();
+  await hydrateSavedTeknis();
+  await refreshSavedTekniProfileScope();
+  const savedTeknis = getAllSavedTeknisForSync();
+  const savedTekniTombstones = getAllSavedTekniTombstonesForSync();
 
   const payload = {
     deviceId: settings.deviceId,
@@ -122,6 +150,8 @@ export async function syncNow(): Promise<SyncResult> {
     snapshot: {
       profiles,
       events,
+      savedTeknis,
+      savedTekniTombstones,
     },
   };
 
@@ -141,8 +171,12 @@ export async function syncNow(): Promise<SyncResult> {
       ok: false,
       pushedProfiles: 0,
       pushedEvents: 0,
+      pushedTeknis: 0,
+      pushedTekniTombstones: 0,
       pulledProfiles: 0,
       pulledEvents: 0,
+      pulledTeknis: 0,
+      pulledTekniTombstones: 0,
       message: `Push failed: HTTP ${pushRes.status}`,
     };
   }
@@ -157,8 +191,12 @@ export async function syncNow(): Promise<SyncResult> {
       ok: false,
       pushedProfiles: profiles.length,
       pushedEvents: events.length,
+      pushedTeknis: savedTeknis.length,
+      pushedTekniTombstones: savedTekniTombstones.length,
       pulledProfiles: 0,
       pulledEvents: 0,
+      pulledTeknis: 0,
+      pulledTekniTombstones: 0,
       message: `Pull failed: HTTP ${pullRes.status}`,
     };
   }
@@ -167,17 +205,22 @@ export async function syncNow(): Promise<SyncResult> {
     ok: boolean;
     profiles?: UserProfile[];
     events?: SavedEvent[];
+    savedTeknis?: SyncedSavedTekniRecord[];
+    savedTekniTombstones?: SyncedSavedTekniTombstone[];
     serverTime?: string;
   };
 
   const pulledProfiles = data.profiles ?? [];
   const pulledEvents = data.events ?? [];
+  const pulledTeknis = data.savedTeknis ?? [];
+  const pulledTekniTombstones = data.savedTekniTombstones ?? [];
 
   for (const profile of pulledProfiles) {
     await saveProfile(profile);
   }
 
   importEvents(pulledEvents);
+  upsertImportedSavedTeknis(pulledTeknis, pulledTekniTombstones);
 
   const updated = await setSyncSettings({
     lastSyncAt: data.serverTime ?? new Date().toISOString(),
@@ -187,8 +230,12 @@ export async function syncNow(): Promise<SyncResult> {
     ok: true,
     pushedProfiles: profiles.length,
     pushedEvents: events.length,
+    pushedTeknis: savedTeknis.length,
+    pushedTekniTombstones: savedTekniTombstones.length,
     pulledProfiles: pulledProfiles.length,
     pulledEvents: pulledEvents.length,
+    pulledTeknis: pulledTeknis.length,
+    pulledTekniTombstones: pulledTekniTombstones.length,
     message: `Synced at ${updated.lastSyncAt}`,
   };
 }

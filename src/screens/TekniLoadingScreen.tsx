@@ -46,8 +46,12 @@ export default function TekniLoadingScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (currentStep >= STEPS.length) {
       // All steps done — compute and navigate
-            const tekni = computeTekni(route.params);
-      navigation.replace('TekniResult', { tekniJson: JSON.stringify(tekni) });
+      const tekni = computeTekni(route.params);
+      navigation.replace('TekniResult', {
+        tekniJson: JSON.stringify(tekni),
+        savedTekniId: route.params.savedTekniId,
+        suggestedSaveName: route.params.suggestedSaveName,
+      });
       return;
     }
     const timer = setTimeout(() => setCurrentStep(s => s + 1), STEPS[currentStep].duration);

@@ -10,7 +10,13 @@ import {
   MuhuratResultsScreen,
 } from '../mfes/muhurat-mfe';
 import { PujaHomeScreen, PujaNavigatorScreen, StepDetailScreen, SamagriScreen } from '../mfes/puja-mfe';
-import { TekniInputScreen, TekniLoadingScreen, TekniResultScreen } from '../mfes/tekni-mfe';
+import {
+  TekniInputScreen,
+  TekniLibraryScreen,
+  TekniLoadingScreen,
+  TekniRestoreScreen,
+  TekniResultScreen,
+} from '../mfes/tekni-mfe';
 import type { RootStackParamList } from './types';
 import { useTheme } from '../contexts/UIContext';
 
@@ -110,6 +116,11 @@ export default function AppNavigator() {
         options={{ title: t('nav.tekniInput', 'Tekni - Janam Kundali') }}
       />
       <Stack.Screen
+        name="TekniLibrary"
+        component={TekniLibraryScreen}
+        options={{ title: 'My Teknis' }}
+      />
+      <Stack.Screen
         name="TekniLoading"
         component={TekniLoadingScreen}
         options={{ title: t('nav.tekniLoading', 'Computing Kundali...'), headerShown: false }}
@@ -118,6 +129,11 @@ export default function AppNavigator() {
         name="TekniResult"
         component={TekniResultScreen}
         options={{ title: t('nav.tekniResult', 'Tekni - Your Takni') }}
+      />
+      <Stack.Screen
+        name="TekniRestore"
+        component={TekniRestoreScreen}
+        options={{ title: 'Restore Tekni' }}
       />
       <Stack.Screen
         name="PujaNavigator"

@@ -16,7 +16,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.puzapaath.app",
       "infoPlist": {
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": ["audio"],
+        "NSUserNotificationsUsageDescription": "Janthari uses notifications to remind you about important tithis and family birthdays."
       }
     },
     "android": {
@@ -54,7 +55,8 @@
       "baseUrl": ""
     },
     "plugins": [
-      "expo-audio"
+      "expo-audio",
+      "expo-notifications"
     ]
   }
 }

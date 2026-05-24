@@ -9,7 +9,11 @@
     "web": "expo start --web",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "deploy": "npx expo export --platform web --output-dir dist && echo 'www.janthari.com' > dist/CNAME && npx gh-pages -d dist"
+    "inject-pwa": "node inject-pwa-tags.js",
+    "copy-public": "cp public/favicon.png dist/favicon.png && cp public/manifest.json dist/manifest.json",
+    "deploy": "bash deploy-cf-pages.sh",
+    "deploy:cf": "bash deploy-cf-pages.sh",
+    "deploy:gh": "npx expo export --platform web --output-dir dist && npm run inject-pwa && npm run copy-public && echo 'www.janthari.com' > dist/CNAME && touch dist/.nojekyll && npx gh-pages -d dist --dotfiles"
   },
   "jest": {
     "preset": "jest-expo",
@@ -30,6 +34,7 @@
     "expo-audio": "~55.0.9",
     "expo-av": "^16.0.8",
     "expo-linear-gradient": "~55.0.8",
+    "expo-notifications": "^56.0.13",
     "expo-status-bar": "~55.0.4",
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",

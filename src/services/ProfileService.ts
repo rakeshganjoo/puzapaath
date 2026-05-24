@@ -75,6 +75,34 @@ export function generateProfileId(): string {
   return `profile_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * Auto-create a profile from Google auth user (minimal defaults).
+ * Used when user tries to save event without explicit Setup.
+ */
+export async function createGuestProfileFromAuth(email: string, name?: string): Promise<UserProfile> {
+  // Today's gregorian date as fallback
+  const today = new Date();
+  const englishBirthday = today.toISOString().split('T')[0]; // YYYY-MM-DD
+
+  // For guest profiles with no lunar date info, use sensible defaults
+  const profile: UserProfile = {
+    id: generateProfileId(),
+    personName: name || email.split('@')[0],
+    gotra: 'Guest',
+    englishBirthday,
+    lunarMonth: 'Chaitra',     // First month of Hindu calendar
+    paksha: 'shukla',
+    tithi: 'Pratipada (1)',    // First tithi
+    day: 'Somvar',             // Monday
+    createdAt: new Date().toISOString(),
+    lastUsedAt: new Date().toISOString(),
+  };
+
+  await saveProfile(profile);
+  await setActiveProfile(profile.id);
+  return profile;
+}
+
 export function subscribeActiveProfile(listener: (profile: UserProfile | null) => void): () => void {
   activeProfileListeners.add(listener);
   getActiveProfile().then((profile) => listener(profile));

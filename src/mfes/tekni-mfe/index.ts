@@ -22,3 +22,5 @@ export { default as TekniScreen } from '../../screens/TekniScreen';
 export { default as TekniInputScreen } from '../../screens/TekniInputScreen';
 export { default as TekniLoadingScreen } from '../../screens/TekniLoadingScreen';
 export { default as TekniResultScreen } from '../../screens/TekniScreen';
+export { default as TekniLibraryScreen } from '../../screens/TekniLibraryScreen';
+export { default as TekniRestoreScreen } from '../../screens/TekniRestoreScreen';

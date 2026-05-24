@@ -2,7 +2,7 @@
 
 > **Feature Tile:** Tekni Making  
 > **App:** Janthari (जंथ्री)  
-> **Status:** Coming Soon  
+> **Status:** Partially Implemented  
 > **Last Updated:** March 19, 2026
 
 ---
@@ -38,6 +38,24 @@ The user must provide the following to generate a Tekni:
 - Provide a searchable list of **major KP-relevant cities**: Srinagar, Jammu, Delhi, Mumbai, Bangalore, Pune, Lucknow, etc.
 - Allow **manual lat/long entry** for births in small villages (e.g., many KPs born in Kashmir valley villages)
 - Default: Srinagar (34.0837°N, 74.7973°E)
+
+## 2.1 Current Delivery Status
+
+The current app already supports these Tekni capabilities:
+
+- Birth-data form entry for name, DOB, TOB, place, coordinates, and gender
+- Astronomical Tekni computation via `TekniService`
+- Tekni preview rendering on web
+- TakniCode generation and QR embedding in HTML/PDF output
+
+The following are not yet implemented in the app and remain roadmap items:
+
+- Save Tekni records locally under a user-chosen unique name
+- Limit saved Teknis to a maximum of 6 per user/profile
+- Reopen a previously saved Tekni without recomputing the full form manually
+- Regenerate a Tekni from a saved TakniCode / QR deep link inside the app
+- Edit or delete saved Teknis
+- Replace an old saved Tekni with a newly generated one when the user chooses
 
 ---
 
@@ -187,6 +205,36 @@ Display the following summary:
 | Varna | Brahmin |
 | Yoni | Mesha (Goat) |
 | Gana | Deva |
+
+## 4.3 Saved Tekni Vault
+
+The app should provide a local-first saved Tekni vault with the following behavior:
+
+| Requirement | Rule |
+|-------------|------|
+| Maximum saved Teknis | 6 per active profile |
+| Saved identity | Each Tekni must have a unique user-chosen name |
+| Storage model | Save both the Tekni birth inputs and the computed output needed for quick reopen |
+| Regeneration | User can regenerate the same Tekni from saved record, TakniCode, or QR deep link |
+| Edit | User can rename or update saved birth details and regenerate |
+| Delete | User can remove any saved Tekni |
+| Replacement | If limit is reached, app should require delete/replace before saving another |
+
+### Saved Tekni Vault UX
+
+- Show a "My Teknis" list from the Tekni entry flow and result flow
+- Allow "Save Tekni" after generation
+- Require a unique display name before saving
+- Show the TakniCode alongside each saved Tekni
+- Provide actions: Open, Rename/Edit, Delete, Share/Export
+- If a QR code or TakniCode is opened, route into the app and reconstruct the Tekni from encoded birth data
+
+### Validation Rules
+
+- Names are required and must be unique within the 6-item vault
+- Save is blocked once 6 Teknis already exist unless the user deletes or replaces one
+- Editing a Tekni must preserve its identity while allowing renamed metadata
+- Regenerated Tekni must match the original encoded birth parameters
 
 ---
 

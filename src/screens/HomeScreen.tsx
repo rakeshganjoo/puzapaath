@@ -15,6 +15,8 @@ import type { RootStackParamList } from '../navigation/types';
 import { gregorianToLunar, DAYS } from '../services/HinduCalendar';
 import { KP_FESTIVALS, getMonthlyObservances, type KPFestival } from '../data/kpFestivals';
 import { useTheme } from '../contexts/UIContext';
+import { useAuth } from '../contexts/AuthContext';
+import { getActiveProfile } from '../services/ProfileService';
 import type { AppLocale } from '../i18n/translations';
 
 const logoImg = require('../assets/images/tiles/jan-swastik_tile.jpeg');
@@ -40,6 +42,7 @@ type Tile = {
   title: string;
   sub: string;
   screen?: keyof RootStackParamList;
+  params?: RootStackParamList[keyof RootStackParamList];
   soon?: boolean;
   img?: ImageSourcePropType;
 };
@@ -58,7 +61,20 @@ function detectWebBrowser(): 'chrome' | 'safari' | 'edge' | 'firefox' | 'other' 
 
 export default function HomeScreen({ navigation }: Props) {
   const { locale, setLocale, t } = useTheme();
+  const { user, isAuthenticated, signInWithGoogle, signOut } = useAuth();
+  const [activeProfileName, setActiveProfileName] = React.useState<string | null>(null);
+  const [activeProfileId, setActiveProfileId] = React.useState<string | null>(null);
   const { width } = useWindowDimensions();
+
+  // Load active profile name
+  React.useEffect(() => {
+    const loadProfile = async () => {
+      const profile = await getActiveProfile();
+      setActiveProfileName(profile?.personName ?? null);
+      setActiveProfileId(profile?.id ?? null);
+    };
+    loadProfile();
+  }, []);
 
   const browser = useMemo(() => detectWebBrowser(), []);
   const isWeb = Platform.OS === 'web';
@@ -161,7 +177,60 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={st.scroll} contentContainerStyle={st.scrollInner}>
-      <View style={[st.container, { width: contentWidth }]}> 
+      <View style={[st.container, { width: contentWidth }]}>
+        {/* Auth & Profile Section */}
+        <View style={st.authSection}>
+          {isAuthenticated && user ? (
+            <View style={st.authCard}>
+              <View style={st.authCardContent}>
+                <View style={st.authInfo}>
+                  <Text style={st.authLabel}>Signed In</Text>
+                  <Text style={st.authEmail}>{user.email}</Text>
+                  {activeProfileName && (
+                    <Text style={st.authProfile}>Profile: <Text style={st.authProfileName}>{activeProfileName}</Text></Text>
+                  )}
+                </View>
+                <TouchableOpacity style={st.logoutBtn} onPress={signOut}>
+                  <Text style={st.logoutText}>Logout</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={st.authQuickRow}>
+                <TouchableOpacity
+                  style={st.authQuickBtn}
+                  onPress={() => navigation.navigate('Calendar', { openAllEvents: true })}
+                >
+                  <Text style={st.authQuickBtnText}>My Events</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={st.authQuickBtn}
+                  onPress={() => navigation.navigate('TekniLibrary')}
+                >
+                  <Text style={st.authQuickBtnText}>My Tekni</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={st.authQuickBtn}
+                  onPress={() => navigation.navigate('Setup', { activeProfileId: activeProfileId ?? undefined })}
+                >
+                  <Text style={st.authQuickBtnText}>Update Profile</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={st.authCardSignIn}>
+              <View style={st.authCardContent}>
+                <View style={st.authInfo}>
+                  <Text style={[st.authLabel, st.authLabelSignedOut]}>Not Signed In</Text>
+                  <Text style={st.authHint}>Sign in to save Takni and Events.</Text>
+                </View>
+                <TouchableOpacity style={st.signinBtn} onPress={signInWithGoogle}>
+                  <Text style={st.signinText}>Sign In</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+
         <LinearGradient
           colors={['#FEF8E8', '#F3F0EB', '#F8F4EF']}
           start={{ x: 0, y: 0 }}
@@ -257,7 +326,7 @@ export default function HomeScreen({ navigation }: Props) {
                 <TouchableOpacity
                   key={i}
                   style={st.tileWrap}
-                  onPress={() => navigation.navigate(tile.screen as any)}
+                  onPress={() => navigation.navigate(tile.screen as any, tile.params as any)}
                   activeOpacity={0.8}
                   accessibilityRole="button"
                   accessibilityLabel={`${tile.title}. ${tile.sub}`}
@@ -289,6 +358,69 @@ const st = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: '#F4F4F7' },
   scrollInner: { alignItems: 'center', paddingVertical: 6 },
   container: { maxWidth: 1120 },
+
+  authSection: { width: '100%', paddingHorizontal: 14, marginBottom: 8 },
+  authCard: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#A5D6A7',
+    padding: 12,
+    marginBottom: 6,
+  },
+  authCardSignIn: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FFB74D',
+    padding: 12,
+    marginBottom: 6,
+  },
+  authCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  authInfo: { flex: 1 },
+  authLabel: { fontSize: 13, fontWeight: '700', color: '#2E7D32' },
+  authEmail: { fontSize: 12, color: '#558B2F', marginTop: 2 },
+  authProfile: { fontSize: 12, color: '#558B2F', marginTop: 4 },
+  authProfileName: { fontWeight: '700' },
+  authHint: { fontSize: 11, color: '#E65100', marginTop: 2 },
+  authLabelSignedOut: { color: '#E65100' },
+  signinBtn: {
+    backgroundColor: '#FF9800',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginLeft: 10,
+  },
+  signinText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  logoutBtn: {
+    backgroundColor: 'rgba(46, 125, 50, 0.15)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginLeft: 10,
+    borderWidth: 1,
+    borderColor: '#A5D6A7',
+  },
+  logoutText: { color: '#2E7D32', fontSize: 12, fontWeight: '700' },
+  authQuickRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  authQuickBtn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#A5D6A7',
+  },
+  authQuickBtnText: { color: '#2E7D32', fontSize: 11, fontWeight: '700' },
 
   heroCard: {
     borderRadius: 18,

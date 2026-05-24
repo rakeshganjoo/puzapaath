@@ -2,8 +2,8 @@ import { Linking, Platform } from 'react-native';
 import { getJSON, remove, setJSON } from './StorageService';
 
 const AUTH_STORAGE_KEY = 'janthari_auth_session_v1';
-const COGNITO_DOMAIN = process.env.EXPO_PUBLIC_COGNITO_DOMAIN || 'https://cwfriends-auth.auth.us-east-1.amazoncognito.com';
-const COGNITO_CLIENT_ID = process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID || '3dumhinotd2th14vfq4k33vd5q';
+const COGNITO_DOMAIN = process.env.EXPO_PUBLIC_COGNITO_DOMAIN || 'https://janthari-auth.auth.us-east-1.amazoncognito.com';
+const COGNITO_CLIENT_ID = process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID || '6a93379a73e0pj5n7l0md2m716';
 
 export interface AuthTokens {
   accessToken: string;
@@ -171,14 +171,19 @@ export async function getValidAuthSession(): Promise<AuthSession | null> {
     return existing;
   }
 
+  if (!existing.tokens.refreshToken) {
+    // Keep local session until explicit logout even when refresh token is missing.
+    return existing;
+  }
+
   try {
     const tokens = await refreshTokens(existing.tokens.refreshToken);
     const session = { ...existing, tokens };
     await storeAuthSession(session);
     return session;
   } catch {
-    await clearAuthSession();
-    return null;
+    // Keep user logged in during transient network/auth outages.
+    return existing;
   }
 }
 

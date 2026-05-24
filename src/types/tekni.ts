@@ -36,3 +36,34 @@ export interface TekniData {
   grahas: GrahaPosition[];
   saptarshiYear: number;
 }
+
+export interface SavedTekniRecord {
+  id: string;
+  profileId: string;
+  name: string;
+  takniCode: string;
+  birth: TakniBirthData;
+  tekni?: TekniData;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SyncedSavedTekniRecord {
+  id: string;
+  profileId: string;
+  name: string;
+  takniCode: string;
+  birth: TakniBirthData;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SyncedSavedTekniTombstone {
+  id: string;
+  profileId: string;
+  deletedAt: number;
+}
+
+export type SaveTekniResult =
+  | { ok: true; record: SavedTekniRecord }
+  | { ok: false; reason: 'no-profile' | 'limit-reached' | 'duplicate-name' };

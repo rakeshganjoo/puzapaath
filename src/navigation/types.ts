@@ -10,9 +10,9 @@
 export type RootStackParamList = {
   Home: undefined;
   PujaHome: undefined;
-  Setup: undefined;
+  Setup: { activeProfileId?: string } | undefined;
   Samagri: undefined;
-  Calendar: undefined;
+  Calendar: { openAllEvents?: boolean } | undefined;
   CalendarExplainer: undefined;
   TithiCalculator: undefined;
   MuhuratEventPicker: undefined;
@@ -36,7 +36,7 @@ export type RootStackParamList = {
     person2TOB?: string;
     person2POB?: string;
   };
-  TekniInput: undefined;
+  TekniInput: { savedTekniId?: string } | undefined;
   TekniLoading: {
     name: string;
     fatherName: string;
@@ -55,8 +55,12 @@ export type RootStackParamList = {
     userLagnaRashi?: number;  // 1-12 if user provides
     userMoonRashi?: number;
     userGrahaRashis?: string; // JSON string of {grahaName: rashiNum}
+    savedTekniId?: string;
+    suggestedSaveName?: string;
   };
-  TekniResult: { tekniJson: string };
+  TekniResult: { tekniJson: string; savedTekniId?: string; suggestedSaveName?: string };
+  TekniLibrary: undefined;
+  TekniRestore: { code: string; name?: string };
   PujaNavigator: { partId: 'A' | 'B' | 'C' };
   StepDetail: { partId: 'A' | 'B' | 'C'; stepIndex: number };
 };

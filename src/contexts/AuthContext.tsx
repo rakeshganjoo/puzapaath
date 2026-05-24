@@ -45,6 +45,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted && callbackSession) {
           setSession(callbackSession);
         } else if (mounted) {
+          const stored = await getStoredAuthSession();
+          if (stored) {
+            setSession(stored);
+          }
           const next = await getValidAuthSession();
           setSession(next);
         }
