@@ -653,6 +653,11 @@ export default function CalendarScreen({ navigation, route }: Props) {
               </Text>
               
               {/* Kshaya / Adhika indicators */}
+              {d.isAdhikMaas && (
+                <Text style={[styles.kshayaAdhikaTag, { backgroundColor: '#FFE0B2', color: '#BF360C' }, sel && { color: '#fff', backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+                  ⚜ Adhik
+                </Text>
+              )}
               {d.isAdhika && (
                 <Text style={[styles.kshayaAdhikaTag, { backgroundColor: '#E3F2FD', color: '#1565C0' }, sel && { color: '#fff', backgroundColor: 'rgba(255,255,255,0.25)' }]}>
                   ⟲ Adhika
@@ -731,6 +736,9 @@ export default function CalendarScreen({ navigation, route }: Props) {
             <Text style={styles.legendText}>K = Krishna Paksha (Dark)</Text>
           </View>
           <View style={styles.legendItem}>
+            <Text style={styles.legendText}>⚜ Adhik = Adhik Maas (intercalary lunar month)</Text>
+          </View>
+          <View style={styles.legendItem}>
             <Text style={styles.legendText}>⟲ Adhika = Day repeated · ⟳ Kshaya = Day skipped</Text>
           </View>
         </View>
@@ -762,8 +770,16 @@ export default function CalendarScreen({ navigation, route }: Props) {
           {(!isMobile || !detailCardCollapsed) && (
             <>
               <Text style={styles.detailLunar}>
-                {selectedDay.lunarMonth} • {selectedDay.paksha === 'shukla' ? 'Shukla' : 'Krishna'} Paksha • {tithiLabel(selectedDay.tithiNum, selectedDay.paksha)} ({selectedDay.tithiNum})
+                {selectedDay.lunarMonth}
+                {selectedDay.isAdhikMaas ? ' (Adhik Maas)' : ''}
+                {' • '}
+                {selectedDay.paksha === 'shukla' ? 'Shukla' : 'Krishna'} Paksha • {tithiLabel(selectedDay.tithiNum, selectedDay.paksha)} ({selectedDay.tithiNum})
               </Text>
+              {selectedDay.isAdhikMaas && (
+                <Text style={styles.detailSpecial}>
+                  ⚜ Adhik Maas — this is an extra (intercalary) lunar month. Tithi anniversaries such as birthdays are observed in the following Nija (real) month, not in this Adhik month.
+                </Text>
+              )}
               {selectedDay.isAdhika && (
                 <Text style={styles.detailSpecial}>⟲ Adhika Tithi — same tithi as the previous day (moon moved slowly)</Text>
               )}
@@ -986,6 +1002,7 @@ export default function CalendarScreen({ navigation, route }: Props) {
                     <Text style={styles.zoomLabel}>Saptarishi Samvat: </Text>
                     {getSamvatDetails(zoomDay.date).saptarishiSamvat}
                   </Text>
+                  {zoomDay.isAdhikMaas && <Text style={[styles.zoomText, { color: '#BF360C' }]}>⚜ Adhik Maas</Text>}
                   {zoomDay.isAdhika && <Text style={[styles.zoomText, { color: '#1565C0' }]}>⟲ Adhika Tithi</Text>}
                   {zoomDay.isKshaya && <Text style={[styles.zoomText, { color: '#E65100' }]}>⟳ Kshaya Tithi</Text>}
                 </View>

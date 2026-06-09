@@ -32,17 +32,28 @@ function daysInMonth(y: number, m: number): number {
   return new Date(y, m, 0).getDate();
 }
 
-/** Find the next upcoming occurrence of this tithi (today or future, up to 2 years ahead) */
+/**
+ * Find the next upcoming occurrence of this tithi (today or future, up to 2 years ahead).
+ *
+ * Adhik Maas handling: tithi anniversaries (birthdays, shraddhas) are observed
+ * in the Nija (real) month, never the Adhik (intercalary) month. So when both
+ * an Adhik and a Nija match exist in the search window, we return the Nija
+ * one even if the Adhik one is calendrically earlier. The Adhik match is
+ * still surfaced separately so the user knows it exists.
+ */
 function findNextOccurrence(
   targetMonth: string,
   targetPaksha: 'shukla' | 'krishna',
   targetTithiNum: number,
-): Date | null {
+): { nija: Date | null; adhik: Date | null } {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const curYear = today.getFullYear();
-  // Search current year and next two years for next upcoming date
-  for (let yr = curYear; yr <= curYear + 2; yr++) {
+  let nija: Date | null = null;
+  let adhik: Date | null = null;
+
+  // Search current year and next two years
+  outer: for (let yr = curYear; yr <= curYear + 2; yr++) {
     for (let m = 1; m <= 12; m++) {
       const days = getMonthCalendar(yr, m);
       for (const d of days) {
@@ -52,12 +63,17 @@ function findNextOccurrence(
           d.tithiNum === targetTithiNum &&
           d.date >= today
         ) {
-          return d.date;
+          if (d.isAdhikMaas) {
+            if (!adhik) adhik = d.date;
+          } else {
+            nija = d.date;
+            break outer;
+          }
         }
       }
     }
   }
-  return null;
+  return { nija, adhik };
 }
 
 export default function TithiCalculatorScreen({ navigation }: Props) {
@@ -275,7 +291,19 @@ export default function TithiCalculatorScreen({ navigation }: Props) {
           <View style={styles.divider} />
 
           <Text style={styles.resultLabel}>Lunar Month (Maas)</Text>
-          <Text style={styles.resultValue}>{result.lunarMonth}</Text>
+          <Text style={styles.resultValue}>
+            {result.lunarMonth}
+            {result.isAdhikMaas && <Text style={styles.adhikBadge}>  • Adhik Maas</Text>}
+          </Text>
+          {result.isAdhikMaas && (
+            <Text style={styles.adhikInline}>
+              This date falls in an Adhik Maas (intercalary lunar month — added
+              roughly every 32½ months when Sun stays in the same sidereal sign
+              across two new moons). Tithi anniversaries such as birthdays are
+              traditionally observed in the following Nija (real) month, not in
+              this Adhik Maas.
+            </Text>
+          )}
 
           <Text style={styles.resultLabel}>Paksha (Lunar Phase)</Text>
           <Text style={styles.resultValue}>
@@ -295,17 +323,34 @@ export default function TithiCalculatorScreen({ navigation }: Props) {
           </Text>
 
           {(() => {
-            const occ = findNextOccurrence(result.lunarMonth, result.paksha, result.tithiNum);
-            if (!occ) return null;
-            const occYear = occ.getFullYear();
-            const occMonth = MONTH_NAMES[occ.getMonth() + 1];
-            const occDay = occ.getDate();
+            const { nija, adhik } = findNextOccurrence(result.lunarMonth, result.paksha, result.tithiNum);
+            if (!nija && !adhik) return null;
+            const fmtDate = (d: Date) =>
+              `${MONTH_NAMES[d.getMonth() + 1]} ${d.getDate()}, ${d.getFullYear()}`;
             const curYear = new Date().getFullYear();
-            const label = occYear === curYear ? '📅 Next occurrence this year on' : `📅 Next occurrence on`;
+            const occ = nija ?? adhik!;
+            const isThisYear = occ.getFullYear() === curYear;
+            const label = nija
+              ? (isThisYear ? '📅 Next occurrence this year on' : '📅 Next occurrence on')
+              : '📅 Only an Adhik Maas occurrence found on';
             return (
               <View style={styles.thisYearBox}>
                 <Text style={styles.thisYearLabel}>{label}</Text>
-                <Text style={styles.thisYearValue}>{occMonth} {occDay}, {occYear}</Text>
+                <Text style={styles.thisYearValue}>{fmtDate(occ)}</Text>
+                {nija && adhik && (
+                  <Text style={styles.adhikNote}>
+                    Note: An Adhik Maas occurrence also falls on {fmtDate(adhik)}, but
+                    anniversary tithis are traditionally observed in the Nija (real) month
+                    shown above.
+                  </Text>
+                )}
+                {!nija && adhik && (
+                  <Text style={styles.adhikNote}>
+                    This date falls in an Adhik Maas (intercalary month). Tithi
+                    anniversaries are typically observed in the Nija month — if none
+                    appears within two years, please consult your pandit.
+                  </Text>
+                )}
               </View>
             );
           })()}
@@ -513,6 +558,25 @@ const styles = StyleSheet.create({
   },
   thisYearLabel: { fontSize: 12, color: '#2E7D32', fontWeight: '600' },
   thisYearValue: { fontSize: 16, color: '#2E7D32', fontWeight: '700', marginTop: 4 },
+  adhikNote: {
+    fontSize: 12,
+    color: '#6B4A2D',
+    marginTop: 8,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  adhikBadge: { color: '#E65100', fontWeight: '700' },
+  adhikInline: {
+    fontSize: 12,
+    color: '#6B4A2D',
+    marginTop: 6,
+    fontStyle: 'italic',
+    lineHeight: 18,
+    backgroundColor: '#FFF8E1',
+    padding: 10,
+    borderRadius: 8,
+  },
   infoCard: {
     backgroundColor: '#F0EDFF',
     borderRadius: 14,

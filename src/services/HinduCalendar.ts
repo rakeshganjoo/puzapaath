@@ -306,15 +306,24 @@ function getLunarDay(year: number, month: number, day: number): number {
 }
 
 /**
- * Lunar month naming using Purnimant convention:
+ * Lunar month naming using Purnimant convention, with Adhik Maas detection.
  *
  * 1. Find the new moon (Amavasya) that starts the current lunation.
  * 2. Sun's sidereal rashi at that new moon gives the Amant base month.
  * 3. Shukla Paksha (lunarDay 1-15): uses the base month name.
  * 4. Krishna Paksha (lunarDay 16-30): uses base + 1 (Purnimant shift).
  *    e.g. NM in Vrishchika → Margshirsh base → Krishna = Paush
+ *
+ * Adhik Maas (intercalary month) detection:
+ *   When two consecutive new moons fall in the SAME sidereal rashi, the
+ *   first lunation of the pair is the "Adhik" (extra) month and the second
+ *   is the "Nija" (real) month. Standard Drik Siddhanta convention.
+ *   Tithi anniversaries (birthdays, shraddhas) are observed in the Nija
+ *   month, never the Adhik month.
  */
-function getLunarMonth(year: number, month: number, day: number, lunarDay: number): string {
+function getLunarMonthInfo(
+  year: number, month: number, day: number, lunarDay: number,
+): { name: string; isAdhik: boolean } {
   const jd = gregorianToJD(year, month, day) + IST_SUNRISE_OFFSET;
 
   // Handle kshaya Pratipada: when lunarDay is 1 but raw tithi is still 30,
@@ -323,23 +332,40 @@ function getLunarMonth(year: number, month: number, day: number, lunarDay: numbe
   const kshayaPratipada = (lunarDay === 1 && rawTithi === 30);
 
   let nmJD: number;
+  let nmK: number;
   if (kshayaPratipada) {
-    const { jd: futureNM } = findPreviousNewMoon(jd + 1);
-    nmJD = futureNM;
+    const upcoming = findPreviousNewMoon(jd + 1);
+    nmJD = upcoming.jd;
+    nmK = upcoming.k;
   } else {
     const prev = findPreviousNewMoon(jd);
     nmJD = prev.jd;
+    nmK = prev.k;
   }
 
   // Sun's sidereal rashi at the new moon determines the base (Amant) month
   const solarAtNM = siderealSolarLongitude(nmJD);
   const rashiIdx = Math.floor(solarAtNM / 30);
 
+  // Adhik Maas detection: compare this NM's rashi with the NEXT NM's rashi.
+  // If they share a rashi, THIS lunation is the Adhik (extra) one;
+  // the following lunation in the same rashi is the Nija (real) one.
+  const nextNmJD = computeNewMoonJD(nmK + 1);
+  const solarAtNextNM = siderealSolarLongitude(nextNmJD);
+  const nextRashiIdx = Math.floor(solarAtNextNM / 30);
+  const isAdhik = rashiIdx === nextRashiIdx;
+
   // Purnimant: Krishna Paksha gets the next month name
-  if (lunarDay > 15) {
-    return RASHI_TO_MONTH[(rashiIdx + 1) % 12];
-  }
-  return RASHI_TO_MONTH[rashiIdx];
+  const baseName = lunarDay > 15
+    ? RASHI_TO_MONTH[(rashiIdx + 1) % 12]
+    : RASHI_TO_MONTH[rashiIdx];
+
+  return { name: baseName, isAdhik };
+}
+
+/** Backwards-compatible helper that returns just the month name. */
+function getLunarMonth(year: number, month: number, day: number, lunarDay: number): string {
+  return getLunarMonthInfo(year, month, day, lunarDay).name;
 }
 
 // ── Public API ──────────────────────────────────────────────────────────
@@ -350,6 +376,8 @@ export interface LunarDate {
   tithi: string;
   tithiNum: number;
   day: string;
+  /** True when this date falls inside an Adhik Maas (intercalary lunar month). */
+  isAdhikMaas?: boolean;
 }
 
 const TITHI_NAMES = [
@@ -379,12 +407,19 @@ export function gregorianToLunar(dateStr: string): LunarDate | null {
     ? TITHI_AMAVASYA
     : TITHI_NAMES[Math.min(tithiNum - 1, 14)];
 
-  const lunarMonth = getLunarMonth(year, month, day, lunarDay);
+  const monthInfo = getLunarMonthInfo(year, month, day, lunarDay);
 
   const dateObj = new Date(year, month - 1, day);
   const dayOfWeek = DAYS[dateObj.getDay()];
 
-  return { lunarMonth, paksha, tithi, tithiNum, day: dayOfWeek };
+  return {
+    lunarMonth: monthInfo.name,
+    paksha,
+    tithi,
+    tithiNum,
+    day: dayOfWeek,
+    isAdhikMaas: monthInfo.isAdhik || undefined,
+  };
 }
 
 /**
@@ -424,12 +459,19 @@ export function gregorianToLunarWithTime(
 
   // For lunar month, use the same logic but with this JD
   const lunarDay = rawTithi;
-  const lunarMonth = getLunarMonth(year, month, day, lunarDay);
+  const monthInfo = getLunarMonthInfo(year, month, day, lunarDay);
 
   const dateObj = new Date(year, month - 1, day);
   const dayOfWeek = DAYS[dateObj.getDay()];
 
-  return { lunarMonth, paksha, tithi, tithiNum, day: dayOfWeek };
+  return {
+    lunarMonth: monthInfo.name,
+    paksha,
+    tithi,
+    tithiNum,
+    day: dayOfWeek,
+    isAdhikMaas: monthInfo.isAdhik || undefined,
+  };
 }
 
 // ── Calendar generation ─────────────────────────────────────────────────
@@ -448,6 +490,8 @@ export interface CalendarDay {
   isKshaya?: boolean;
   /** The tithi name that was skipped, if isKshaya is true. */
   skippedTithi?: string;
+  /** True when this day falls inside an Adhik Maas (intercalary lunar month). */
+  isAdhikMaas?: boolean;
 }
 
 /** Tithi name for a given raw lunar day (1-30). */
@@ -489,10 +533,12 @@ export function getMonthCalendar(year: number, month: number): CalendarDay[] {
       skippedTithi = tithiNameForLunarDay(expectedNext);
     }
 
+    const monthInfo = getLunarMonthInfo(year, month, d, lunarDay);
+
     result.push({
       date: dateObj,
       day: d,
-      lunarMonth: getLunarMonth(year, month, d, lunarDay),
+      lunarMonth: monthInfo.name,
       paksha,
       tithiNum,
       tithiName: paksha === 'krishna' && tithiNum === 15
@@ -502,6 +548,7 @@ export function getMonthCalendar(year: number, month: number): CalendarDay[] {
       isAdhika: isAdhika || undefined,
       isKshaya: isKshaya || undefined,
       skippedTithi,
+      isAdhikMaas: monthInfo.isAdhik || undefined,
     });
 
     prevLunarDay = lunarDay;
