@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { CommonActions } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { gregorianToLunar, DAYS } from '../services/HinduCalendar';
@@ -158,12 +159,11 @@ export default function HomeScreen({ navigation }: Props) {
   ];
 
   const handleHelpPress = React.useCallback(() => {
-    // Use push when available so Help always opens even if navigation state is stale.
-    if (typeof (navigation as any)?.push === 'function') {
-      (navigation as any).push('Help');
-      return;
+    try {
+      navigation.navigate('Help' as never);
+    } catch {
+      navigation.dispatch(CommonActions.navigate({ name: 'Help' }));
     }
-    navigation.navigate('Help');
   }, [navigation]);
 
   return (
@@ -313,9 +313,30 @@ export default function HomeScreen({ navigation }: Props) {
 
         {/* ── Footer ───────────────────────────────────────── */}
         <View style={st.footerCard}>
+          <Text style={st.footerText}>Namaskar.</Text>
           <Text style={st.footerText}>
-            {'Namaskar,\n\nThis is our effort to help the KP community stay rooted in traditions and values while making important dates and tithis easily accessible.\n\nCalendar and tithi outputs are computed using trusted astronomical references with precise calculation logic.\n\nFor transparency, please review the "How This Works" section to understand the methodology behind each result.\n\nWe will continue to improve the app with regular updates while keeping the experience simple and consistent.'}
+            This app helps the KP community stay rooted in tradition while keeping important dates and tithis accessible.
           </Text>
+          <Text style={st.footerText}>
+            Calendar and tithi outputs are computed using trusted astronomical references.
+          </Text>
+          <Text style={st.footerText}>
+            Please review the "How This Works" section for full methodology.
+          </Text>
+          <Text style={[st.footerText, st.footerTextLast]}>
+            We will continue to improve the app with regular updates while keeping the experience simple and consistent.
+          </Text>
+
+          <TouchableOpacity
+            style={st.footerHelpBtn}
+            onPress={handleHelpPress}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Open Help and FAQ"
+          >
+            <Ionicons name="help-circle-outline" size={14} color="#596273" />
+            <Text style={st.footerHelpBtnText}>Open Help & FAQ</Text>
+          </TouchableOpacity>
         </View>
 
       </View>
@@ -527,8 +548,29 @@ const st = StyleSheet.create({
   },
   footerText: {
     fontSize: 11,
-    lineHeight: 18,
+    lineHeight: 15,
     color: '#5A5A66',
     textAlign: 'center',
+    marginBottom: 3,
+  },
+  footerTextLast: {
+    marginBottom: 8,
+  },
+  footerHelpBtn: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D7DBE2',
+    backgroundColor: '#EEF1F5',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  footerHelpBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4A5260',
   },
 });
