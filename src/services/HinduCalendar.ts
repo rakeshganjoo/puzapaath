@@ -287,22 +287,72 @@ function rawTithiAtJD(jd: number): number {
  * ends before tomorrow's, it never "prevails" at any sunrise.  Standard
  * panchang convention assigns the kshaya Pratipada to the earlier day so
  * that key festivals (Navreh, etc.) are never missing from the calendar.
+ *
+ * UPDATED (June 2026): Now returns the actual tithi observed at sunrise.
+ * Anomaly detection (kshaya/adhika) is tracked separately for display annotation.
  */
 function getLunarDay(year: number, month: number, day: number): number {
   const jd = gregorianToJD(year, month, day) + IST_SUNRISE_OFFSET;
   const tithiToday = rawTithiAtJD(jd);
 
-  // Only adjust at paksha boundaries (Amavasya→Pratipada or Purnima→K.Pratipada)
-  if (tithiToday === 30 || tithiToday === 15) {
-    const tithiTomorrow = rawTithiAtJD(jd + 1);
+  // Return the actual tithi observed at this sunrise
+  // Kshaya/Adhika anomalies are flagged separately for user display
+  return tithiToday;
+}
+
+/**
+ * Detect if a tithi is missing (kshaya/skipped) or doubled (adhika) at this date.
+ * Returns metadata for calendar display annotation.
+ * 
+ * - isMissingDay: True if a FOLLOWING tithi is skipped/missing (kshaya tithi).
+ * - missingTithiName: Name of the tithi that was skipped AFTER this day.
+ * - isDoubleDay: True if this tithi repeats on two consecutive days (adhika tithi).
+ */
+function detectTithiAnomalies(year: number, month: number, day: number):
+  { missingTithi?: number; isMissingDay?: boolean; isDoubleDay?: boolean; missingTithiName?: string } {
+  const jd = gregorianToJD(year, month, day) + IST_SUNRISE_OFFSET;
+  const tithiToday = rawTithiAtJD(jd);
+  const tithiTomorrow = rawTithiAtJD(jd + 1);
+  const tithiYesterday = rawTithiAtJD(jd - 1);
+
+  const result: { missingTithi?: number; isMissingDay?: boolean; isDoubleDay?: boolean; missingTithiName?: string } = {};
+
+  // Detect missing tithi (kshaya): gap > 1 at boundary 
+  // Only mark as missing if THIS day is at a paksha boundary (Amavasya/Purnima)
+  if ((tithiToday === 30 || tithiToday === 15) && tithiTomorrow !== 0) {
     const expected = (tithiToday % 30) + 1;
     const gap = ((tithiTomorrow - tithiToday) % 30 + 30) % 30;
     if (gap >= 2) {
-      return expected;
+      // One or more tithis are skipped between today and tomorrow
+      // Mark the first missing tithi (expected next tithi)
+      result.missingTithi = expected;
+      result.isMissingDay = true;
+      result.missingTithiName = getTithiShortName(expected);
     }
   }
 
-  return tithiToday;
+  // Detect double tithi (adhika): same tithi on consecutive days
+  // This day is "double" if same tithi appears tomorrow too
+  if (tithiToday === tithiTomorrow) {
+    result.isDoubleDay = true;
+  }
+
+  return result;
+}
+
+/**
+ * Get short tithi name for display.
+ */
+function getTithiShortName(tithiNum: number): string {
+  const TITHI_SHORT = [
+    'Pratipada', 'Dwitiya', 'Tritiya', 'Chaturthi',
+    'Panchami', 'Shashthi', 'Saptami', 'Ashtami',
+    'Navami', 'Dashami', 'Ekadashi', 'Dwadashi',
+    'Trayodashi', 'Chaturdashi', 'Purnima',
+  ];
+  if (tithiNum === 30) return 'Amavasya';
+  const idx = ((tithiNum - 1) % 15);
+  return TITHI_SHORT[idx] || 'Unknown';
 }
 
 /**
@@ -378,6 +428,14 @@ export interface LunarDate {
   day: string;
   /** True when this date falls inside an Adhik Maas (intercalary lunar month). */
   isAdhikMaas?: boolean;
+  /** Tithi number that was skipped (missing/kshaya tithi). */
+  missingTithiNum?: number;
+  /** Name of missing tithi for display. */
+  missingTithiName?: string;
+  /** True if a tithi is missing on this date (kshaya/skipped day). */
+  isMissingDay?: boolean;
+  /** True if this tithi appears on 2 consecutive days (adhika/double day). */
+  isDoubleDay?: boolean;
 }
 
 const TITHI_NAMES = [
@@ -412,6 +470,9 @@ export function gregorianToLunar(dateStr: string): LunarDate | null {
   const dateObj = new Date(year, month - 1, day);
   const dayOfWeek = DAYS[dateObj.getDay()];
 
+  // Detect anomalies (missing/double tithis) for display flagging
+  const anomalies = detectTithiAnomalies(year, month, day);
+
   return {
     lunarMonth: monthInfo.name,
     paksha,
@@ -419,7 +480,25 @@ export function gregorianToLunar(dateStr: string): LunarDate | null {
     tithiNum,
     day: dayOfWeek,
     isAdhikMaas: monthInfo.isAdhik || undefined,
+    missingTithiNum: anomalies.missingTithi,
+    missingTithiName: anomalies.missingTithiName,
+    isMissingDay: anomalies.isMissingDay,
+    isDoubleDay: anomalies.isDoubleDay,
   };
+}
+
+/**
+ * Format a missing/double day annotation for display to users.
+ * Shows when a tithi was skipped (kshaya) or appears twice (adhika).
+ */
+export function formatTithiAnomalyNote(lunarDate: LunarDate): string | null {
+  if (lunarDate.isDoubleDay) {
+    return `Double day — ${lunarDate.tithi} appears on two consecutive days`;
+  }
+  if (lunarDate.isMissingDay && lunarDate.missingTithiName) {
+    return `${lunarDate.missingTithiName} was short (kshaya tithi) — missing day`;
+  }
+  return null;
 }
 
 /**
