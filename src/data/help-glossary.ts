@@ -1309,7 +1309,7 @@ Check these sources:
     readTime: 2,
     content: `**Q: Lagna, Rashi, Moon sign, Sun sign... I\'m confused. Which one am I?**
 
-**A: Great question! They\'re different things:**
+**A: They are different things:**
 
 **Lagna (Ascendant)**
 - The zodiac sign on the eastern horizon at birth
@@ -1706,7 +1706,7 @@ export const HELP_FAQ: HelpFAQ[] = [
     id: 'faq-mavas-not-showing',
     question: 'Why does a Tithi sometimes appear to be "missing" on the calendar?',
     answer:
-      'Great question. In Kashmiri Pandit and other Hindu calendars, sometimes a lunar day (Tithi) is so short that it doesn\'t "prevail" (reach sunrise) at all. This is called a Kshaya Tithi (skipped day). When this happens, you\'ll see a note on the calendar like "Pratipada was short (kshaya tithi) — missing day." This explains the jump and is not an error. Example: In June 2026, Amavasya is followed by Pratipada the next day, but Pratipada was very short, so the calendar skips from Amavasya directly to Dwitiya. Practical family rule: When you see a "missing day" note, it means the lunar calendar shows the astronomical reality—that Tithi was too short to observe at your sunrise. These are common in Kashmiri calendars.',
+      'In Kashmiri Pandit and other Hindu calendars, sometimes a lunar day (Tithi) is so short that it does not "prevail" (reach sunrise) at all. This is called a Kshaya Tithi (skipped day). When this happens, you will see a note on the calendar like "Pratipada was short (kshaya tithi) — missing day." This explains the jump and is not an error. Example: In June 2026, Amavasya is followed by Pratipada the next day, but Pratipada was very short, so the calendar skips from Amavasya directly to Dwitiya. Practical family rule: when you see a "missing day" note, it means the lunar calendar is showing astronomical reality. These are common in Kashmiri calendars.',
     category: 'Calendar',
     relatedTerms: ['tithi', 'kshaya'],
   },

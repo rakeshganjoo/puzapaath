@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { gregorianToLunar, DAYS } from '../services/HinduCalendar';
@@ -19,14 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getActiveProfile } from '../services/ProfileService';
 import type { AppLocale } from '../i18n/translations';
 
-const logoImg = require('../assets/images/tiles/jan-swastik_tile.jpeg');
-const ganeshaImg = require('../assets/images/tiles/jan-ganesha_tile.jpeg');
-const bramhaImg = require('../assets/images/tiles/jan-bramha_tile.jpeg');
-const birthdayImg = require('../assets/images/tiles/jan-birthday_tile2.jpeg');
-const tekniImg = require('../assets/images/tiles/jan-tekni_tile.jpeg');
-const zatukImg = require('../assets/images/tiles/jan-zatuk_tile.jpeg');
-const tithiImg = require('../assets/images/tiles/jan-tithi_tile.jpeg');
-const saathImg = require('../assets/images/tiles/jan-saath_tile.jpeg');
+const logoImg    = require('../assets/images/tiles/jan-swastik_tile.jpeg');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -35,16 +29,15 @@ const MONTHS = [
   'July','August','September','October','November','December',
 ];
 
-import type { ImageSourcePropType } from 'react-native';
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 type Tile = {
-  icon: string;
+  ionicon: IoniconName;
   title: string;
   sub: string;
   screen?: keyof RootStackParamList;
   params?: RootStackParamList[keyof RootStackParamList];
   soon?: boolean;
-  img?: ImageSourcePropType;
 };
 
 type LayoutProfile = 'mobile' | 'tablet' | 'desktop';
@@ -66,7 +59,6 @@ export default function HomeScreen({ navigation }: Props) {
   const [activeProfileId, setActiveProfileId] = React.useState<string | null>(null);
   const { width } = useWindowDimensions();
 
-  // Load active profile name
   React.useEffect(() => {
     const loadProfile = async () => {
       const profile = await getActiveProfile();
@@ -76,66 +68,56 @@ export default function HomeScreen({ navigation }: Props) {
     loadProfile();
   }, []);
 
-  const browser = useMemo(() => detectWebBrowser(), []);
   const isWeb = Platform.OS === 'web';
   const profile: LayoutProfile = width >= 1100 ? 'desktop' : width >= 760 ? 'tablet' : 'mobile';
   const columns = profile === 'desktop' ? 3 : 2;
-  const horizontalPadding = profile === 'mobile' ? 14 : 20;
-  const gridGap = profile === 'mobile' ? 10 : 14;
-  const maxContentWidth = profile === 'desktop' ? 1120 : profile === 'tablet' ? 860 : 460;
+  const horizontalPadding = profile === 'mobile' ? 12 : 20;
+  const gridGap = 8;
+  const maxContentWidth = profile === 'desktop' ? 1080 : profile === 'tablet' ? 800 : 440;
   const contentWidth = Math.min(width - horizontalPadding * 2, maxContentWidth);
-  const tileWidth = Math.max(148, Math.floor((contentWidth - gridGap * (columns - 1)) / columns));
+  const tileWidthPct = columns === 3 ? '32%' : '48.5%';
+  const tileHeight = profile === 'mobile' ? 120 : 132;
 
-  const tileMinHeight = profile === 'mobile' ? 168 : 182;
-  const titleSize = profile === 'mobile' ? 15 : 17;
-  const subtitleSize = profile === 'mobile' ? 12 : 13;
-
+  // Active features
   const tiles: Tile[] = [
     {
-      icon: '\u25C9',
-      img: ganeshaImg,
+      ionicon: 'calendar-outline',
       title: t('home.tiles.calendarTitle', 'KP Calendar'),
-      sub: t('home.tiles.calendarSub', 'Festivals - Tithis - Print'),
+      sub: t('home.tiles.calendarSub', 'Festivals · Tithis · Print'),
       screen: 'Calendar',
     },
     {
-      icon: '\u25C8',
-      img: tithiImg,
+      ionicon: 'moon-outline',
       title: t('home.tiles.tithiTitle', 'Tithi Calculator'),
-      sub: t('home.tiles.tithiSub', 'Find lunar date for any day'),
+      sub: t('home.tiles.tithiSub', 'Lunar date for any day'),
       screen: 'TithiCalculator',
     },
     {
-      icon: '\u2737',
-      img: saathImg,
-      title: t('home.tiles.muhuratTitle', 'Shubh Muhurat Finder'),
-      sub: t('home.tiles.muhuratSub', 'Auspicious time for events'),
+      ionicon: 'star-outline',
+      title: t('home.tiles.muhuratTitle', 'Shubh Muhurat'),
+      sub: t('home.tiles.muhuratSub', 'Auspicious timings'),
       screen: 'MuhuratEventPicker',
     },
     {
-      icon: '\u2726',
-      img: birthdayImg,
-      title: t('home.tiles.pujaTitle', "Pu'za Paath (Interactive)"),
-      sub: t('home.tiles.pujaSub', 'JanamDin - Step by step'),
+      ionicon: 'flame-outline',
+      title: t('home.tiles.pujaTitle', "Pu'za Paath"),
+      sub: t('home.tiles.pujaSub', 'Interactive · Step by step'),
       screen: 'PujaHome',
     },
     {
-      icon: '\u25CE',
-      img: tekniImg,
-      title: t('home.tiles.tekniTitle', 'Tekni Making'),
-      sub: t('home.tiles.tekniSub', 'Janam Kundali and PDF'),
+      ionicon: 'document-text-outline',
+      title: t('home.tiles.tekniTitle', 'Tekni'),
+      sub: t('home.tiles.tekniSub', 'Janam Kundali · PDF'),
       screen: 'TekniInput',
     },
     {
-      icon: '\u2739',
-      img: zatukImg,
+      ionicon: 'telescope-outline',
       title: t('home.tiles.zatukTitle', 'Zatuk'),
-      sub: t('home.tiles.zatukSub', 'Full Horoscope and Kundali'),
+      sub: t('home.tiles.zatukSub', 'Full Horoscope'),
       soon: true,
     },
     {
-      icon: '\u272D',
-      img: bramhaImg,
+      ionicon: 'planet-outline',
       title: t('home.tiles.jyotishTitle', 'Jyotish'),
       sub: t('home.tiles.jyotishSub', 'Vedic Astrology'),
       soon: true,
@@ -170,158 +152,133 @@ export default function HomeScreen({ navigation }: Props) {
     : '';
 
   const languageButtons: { code: AppLocale; label: string }[] = [
-    { code: 'en', label: t('home.languageShort.en', 'EN') },
-    { code: 'hi', label: t('home.languageShort.hi', 'HI') },
-    { code: 'ks', label: t('home.languageShort.ks', 'KS') },
+    { code: 'en', label: 'EN' },
+    { code: 'hi', label: 'HI' },
+    { code: 'ks', label: 'KS' },
   ];
 
   return (
-    <ScrollView style={st.scroll} contentContainerStyle={st.scrollInner}>
-      <View style={[st.container, { width: contentWidth }]}>
-        {/* Auth & Profile Section */}
-        <View style={st.authSection}>
-          {isAuthenticated && user ? (
-            <View style={st.authCard}>
-              <View style={st.authCardContent}>
-                <View style={st.authInfo}>
-                  <Text style={st.authLabel}>Signed In</Text>
-                  <Text style={st.authEmail}>{user.email}</Text>
-                  {activeProfileName && (
-                    <Text style={st.authProfile}>Profile: <Text style={st.authProfileName}>{activeProfileName}</Text></Text>
-                  )}
-                </View>
-                <TouchableOpacity style={st.logoutBtn} onPress={signOut}>
-                  <Text style={st.logoutText}>Logout</Text>
-                </TouchableOpacity>
-              </View>
+    <ScrollView style={st.scroll} contentContainerStyle={[st.scrollInner, { paddingHorizontal: horizontalPadding }]}>
+      <View style={[st.container, { maxWidth: maxContentWidth }]}>
 
-              <View style={st.authQuickRow}>
-                <TouchableOpacity
-                  style={st.authQuickBtn}
-                  onPress={() => navigation.navigate('Calendar', { openAllEvents: true })}
-                >
-                  <Text style={st.authQuickBtnText}>My Events</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={st.authQuickBtn}
-                  onPress={() => navigation.navigate('TekniLibrary')}
-                >
-                  <Text style={st.authQuickBtnText}>My Tekni</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={st.authQuickBtn}
-                  onPress={() => navigation.navigate('Setup', { activeProfileId: activeProfileId ?? undefined })}
-                >
-                  <Text style={st.authQuickBtnText}>Update Profile</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <View style={st.authCardSignIn}>
-              <View style={st.authCardContent}>
-                <View style={st.authInfo}>
-                  <Text style={[st.authLabel, st.authLabelSignedOut]}>Not Signed In</Text>
-                  <Text style={st.authHint}>Sign in to save Takni and Events.</Text>
-                </View>
-                <View style={st.authGuestActions}>
-                  <TouchableOpacity style={st.setupBtn} onPress={() => navigation.navigate('Setup')}>
-                    <Text style={st.setupBtnText}>Setup Profile</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={st.signinBtn} onPress={signInWithGoogle}>
-                    <Text style={st.signinText}>Sign In</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          )}
-        </View>
-
+        {/* ── Header Card ─────────────────────────────────── */}
         <LinearGradient
-          colors={['#FEF8E8', '#F3F0EB', '#F8F4EF']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          colors={['#FDF6E8', '#F7F2EB']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={st.heroCard}
         >
-          <View style={st.geoCircleOuter} />
-          <View style={st.geoCircleInner} />
-          <View style={st.geoDiamond} />
-
-          <View style={st.headerTopRow}>
+          <View style={st.heroRow}>
             <Image source={logoImg} style={st.logo} />
-            <View style={st.headerText}>
+            <View style={st.heroText}>
               <View style={st.nameRow}>
-                <Text style={st.nameDev}>{'\u091C\u0902\u0925\u094D\u0930\u0940'}</Text>
+                <Text style={st.nameDev}>जंथरी</Text>
                 <Text style={st.nameEng}> Janthari</Text>
               </View>
               {lunar && (
                 <Text style={st.panchang} numberOfLines={2}>
-                  {greg} ({day}){'\n'}
-                  {lunar.lunarMonth} {'\u2022'} {lunar.paksha === 'shukla'
-                    ? t('common.shuklaPaksha', 'Shukla Paksha')
-                    : t('common.krishnaPaksha', 'Krishna Paksha')} {'\u2022'} {tithi}
+                  {greg} · {day}{'\n'}
+                  {lunar.lunarMonth} · {lunar.paksha === 'shukla'
+                    ? t('common.shuklaPaksha', 'Shukla')
+                    : t('common.krishnaPaksha', 'Krishna')} Paksha · {tithi}
                 </Text>
               )}
             </View>
+            {/* Language chips */}
+            <View style={st.langGroup}>
+              {languageButtons.map((item) => (
+                <TouchableOpacity
+                  key={item.code}
+                  style={[st.langChip, locale === item.code && st.langChipActive]}
+                  onPress={() => setLocale(item.code)}
+                  accessibilityRole="button"
+                >
+                  <Text style={[st.langChipText, locale === item.code && st.langChipTextActive]}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-
-          <View style={st.langRow}>
-            <Text style={st.langLabel}>{t('common.language', 'Language')}:</Text>
-            {languageButtons.map((item) => (
-              <TouchableOpacity
-                key={item.code}
-                style={[st.langChip, locale === item.code && st.langChipActive]}
-                onPress={() => setLocale(item.code)}
-                accessibilityRole="button"
-                accessibilityLabel={`Switch language to ${item.label}`}
-              >
-                <Text style={[st.langChipText, locale === item.code && st.langChipTextActive]}>{item.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {isWeb && (
-            <Text style={st.browserHint}>
-              {`Optimized for ${browser} on ${profile}`}
-            </Text>
-          )}
         </LinearGradient>
 
+        {/* ── Today's Festivals ────────────────────────────── */}
         {(todayFestivals.length > 0 || todayObs.length > 0) && (
           <View style={st.festPanel}>
             {todayFestivals.slice(0, 2).map((f: KPFestival, i) => (
               <View key={i} style={[st.festTag, f.category === 'major' && st.festMajor]}>
+                <Ionicons name="sparkles-outline" size={11} color={f.category === 'major' ? '#7B5A2F' : '#666'} style={{ marginRight: 4 }} />
                 <Text style={[st.festText, f.category === 'major' && st.festMajorText]}>{f.name}</Text>
               </View>
             ))}
             {todayObs.slice(0, 2).map((o, i) => (
-              <Text key={`o${i}`} style={st.obsText}>{'\u2022'} {o}</Text>
+              <Text key={`o${i}`} style={st.obsText}>· {o}</Text>
             ))}
           </View>
         )}
 
-        <View style={st.grid}>
+        {/* ── Auth Strip ───────────────────────────────────── */}
+        {isAuthenticated && user ? (
+          <View style={st.authStrip}>
+            <Ionicons name="person-circle-outline" size={16} color="#2E7D32" />
+            <Text style={st.authEmail} numberOfLines={1}>{user.email}</Text>
+            {activeProfileName && <Text style={st.authProfileChip}>{activeProfileName}</Text>}
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity onPress={() => navigation.navigate('Calendar', { openAllEvents: true })} style={st.authBtn}>
+              <Text style={st.authBtnText}>Events</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('TekniLibrary')} style={st.authBtn}>
+              <Text style={st.authBtnText}>Tekni</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Setup', { activeProfileId: activeProfileId ?? undefined })} style={st.authBtn}>
+              <Text style={st.authBtnText}>Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={signOut} style={[st.authBtn, st.authBtnLogout]}>
+              <Text style={[st.authBtnText, st.authBtnLogoutText]}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={st.authStrip}>
+            <Ionicons name="person-outline" size={16} color="#999" />
+            <Text style={st.authGuestLabel}>Sign in to save Tekni & Events</Text>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity onPress={() => navigation.navigate('Setup')} style={st.authBtn}>
+              <Text style={st.authBtnText}>Setup</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={signInWithGoogle} style={[st.authBtn, st.authBtnSignIn]}>
+              <Ionicons name="logo-google" size={12} color="#fff" style={{ marginRight: 4 }} />
+              <Text style={[st.authBtnText, { color: '#fff' }]}>Sign In</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Compact Help Link (kept outside feature modules grid) */}
+        <TouchableOpacity
+          style={st.helpQuickLink}
+          onPress={() => navigation.navigate('Help')}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Help and FAQ"
+        >
+          <View style={st.helpQuickLinkLeft}>
+            <Ionicons name="help-circle-outline" size={16} color="#5B6576" />
+            <View>
+              <Text style={st.helpQuickLinkTitle}>{t('home.tiles.helpTitle', 'Help & FAQ')}</Text>
+              <Text style={st.helpQuickLinkSub}>{t('home.tiles.helpSub', 'Learn · Glossary · Q&A')}</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#7F8794" />
+        </TouchableOpacity>
+
+        {/* ── Feature Grid ─────────────────────────────────── */}
+        <View style={[st.grid, { gap: gridGap }]}>
           {tiles.map((tile, i) => {
-            const endOfRow = (i + 1) % columns === 0;
-            const card = (
-              <View
-                style={[
-                  st.tile,
-                  tile.soon && st.tileSoon,
-                  {
-                    width: tileWidth,
-                    minHeight: tileMinHeight,
-                    marginRight: endOfRow ? 0 : gridGap,
-                  },
-                ]}
-              >
-                <View style={st.tileGeometry}>
-                  <Text style={st.tileGeometryText}>{tile.icon}</Text>
+            const inner = (
+              <View style={[st.tile, { height: tileHeight }, tile.soon && st.tileSoon]}>
+                <View style={st.iconBox}>
+                  <Ionicons name={tile.ionicon} size={28} color='#8B0000' />
                 </View>
-                {tile.img ? <Image source={tile.img} style={st.tileImg} /> : null}
-                <Text style={[st.tileName, { fontSize: titleSize }]} numberOfLines={2}>{tile.title}</Text>
-                <Text style={[st.tileSub, { fontSize: subtitleSize }]} numberOfLines={2}>{tile.sub}</Text>
+                <Text style={st.tileName} numberOfLines={2}>{tile.title}</Text>
+                <Text style={st.tileSub} numberOfLines={2}>{tile.sub}</Text>
                 {tile.soon && (
-                  <View style={st.badge}><Text style={st.badgeText}>{t('common.comingSoon', 'Coming Soon')}</Text></View>
+                  <View style={st.badge}><Text style={st.badgeText}>{t('common.comingSoon', 'Soon')}</Text></View>
                 )}
               </View>
             );
@@ -330,312 +287,237 @@ export default function HomeScreen({ navigation }: Props) {
               return (
                 <TouchableOpacity
                   key={i}
-                  style={st.tileWrap}
+                  style={{ width: tileWidthPct }}
                   onPress={() => navigation.navigate(tile.screen as any, tile.params as any)}
-                  activeOpacity={0.8}
+                  activeOpacity={0.75}
                   accessibilityRole="button"
                   accessibilityLabel={`${tile.title}. ${tile.sub}`}
                 >
-                  {card}
+                  {inner}
                 </TouchableOpacity>
               );
             }
-
-            return (
-              <View key={i} style={st.tileWrap}>
-                {card}
-              </View>
-            );
+            return <View key={i} style={{ width: tileWidthPct }}>{inner}</View>;
           })}
         </View>
 
+        {/* ── Footer ───────────────────────────────────────── */}
         <View style={st.footerCard}>
           <Text style={st.footerText}>
-            {`🙏🏻Namaskar,\n\nThis is our humble effort to help the KP community stay rooted in our traditions and values, while making important dates and tithis easily accessible on the go.\n\nThe calendar and tithi outputs are mathematically computed using trusted astronomical references, with precise calculation logic down to very fine time fractions.\n\nFor complete transparency, we encourage you to explore the "How This Works" section to understand the methodology behind each result.\n\nWe will continue to improve the app with regular updates, while keeping the experience simple, consistent, and meaningful for everyone!`}
+            {'🙏🏻Namaskar,\n\nThis is our humble effort to help the KP community stay rooted in our traditions and values, while making important dates and tithis easily accessible on the go.\n\nThe calendar and tithi outputs are mathematically computed using trusted astronomical references, with precise calculation logic down to very fine time fractions.\n\nFor complete transparency, we encourage you to explore the "How This Works" section to understand the methodology behind each result.\n\nWe will continue to improve the app with regular updates, while keeping the experience simple, consistent, and meaningful for everyone!'}
           </Text>
         </View>
+
       </View>
     </ScrollView>
   );
 }
 
 const st = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#F4F4F7' },
-  scrollInner: { alignItems: 'center', paddingVertical: 6 },
-  container: { maxWidth: 1120 },
+  scroll: { flex: 1, backgroundColor: '#F2F2F5' },
+  scrollInner: { alignItems: 'center', paddingVertical: 10 },
+  container: { width: '100%', alignItems: 'stretch' },
 
-  authSection: { width: '100%', paddingHorizontal: 14, marginBottom: 8 },
-  authCard: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#A5D6A7',
-    padding: 12,
-    marginBottom: 6,
-  },
-  authCardSignIn: {
-    backgroundColor: '#FFF3E0',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#FFB74D',
-    padding: 12,
-    marginBottom: 6,
-  },
-  authCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  authInfo: { flex: 1 },
-  authLabel: { fontSize: 13, fontWeight: '700', color: '#2E7D32' },
-  authEmail: { fontSize: 12, color: '#558B2F', marginTop: 2 },
-  authProfile: { fontSize: 12, color: '#558B2F', marginTop: 4 },
-  authProfileName: { fontWeight: '700' },
-  authHint: { fontSize: 11, color: '#E65100', marginTop: 2 },
-  authLabelSignedOut: { color: '#E65100' },
-  authGuestActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 10,
-  },
-  setupBtn: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#FFB74D',
-    marginRight: 8,
-  },
-  setupBtnText: { color: '#E65100', fontSize: 12, fontWeight: '700' },
-  signinBtn: {
-    backgroundColor: '#FF9800',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  signinText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  logoutBtn: {
-    backgroundColor: 'rgba(46, 125, 50, 0.15)',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginLeft: 10,
-    borderWidth: 1,
-    borderColor: '#A5D6A7',
-  },
-  logoutText: { color: '#2E7D32', fontSize: 12, fontWeight: '700' },
-  authQuickRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 10,
-  },
-  authQuickBtn: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: '#A5D6A7',
-  },
-  authQuickBtnText: { color: '#2E7D32', fontSize: 11, fontWeight: '700' },
-
+  // ── Header Card ──────────────────────────────────────────
   heroCard: {
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#DBD3C3',
-    overflow: 'hidden',
+    borderColor: '#DDD5C4',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     marginBottom: 8,
-    position: 'relative',
   },
-  geoCircleOuter: {
-    position: 'absolute',
-    right: -20,
-    top: -22,
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    borderWidth: 1,
-    borderColor: 'rgba(168, 141, 95, 0.4)',
-  },
-  geoCircleInner: {
-    position: 'absolute',
-    right: 8,
-    top: 8,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(122, 129, 141, 0.45)',
-  },
-  geoDiamond: {
-    position: 'absolute',
-    right: 46,
-    top: 52,
-    width: 14,
-    height: 14,
-    borderWidth: 1,
-    borderColor: '#A8895F',
-    transform: [{ rotate: '45deg' }],
-    backgroundColor: 'rgba(255, 255, 255, 0.55)',
-  },
-
-  headerTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logo: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#D5C6AB',
-    backgroundColor: '#fff',
+    borderColor: '#D0C5B0',
   },
-  headerText: { marginLeft: 8, flex: 1 },
+  heroText: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', flexShrink: 1 },
+  nameDev: { fontSize: 15, fontWeight: '800', color: '#8F744A', flexShrink: 1 },
+  nameEng: { fontSize: 19, fontWeight: '700', color: '#1C2130', flexShrink: 1 },
+  panchang: { fontSize: 11, color: '#4A5068', fontWeight: '600', marginTop: 2, lineHeight: 16 },
 
-  langRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
-  langLabel: { fontSize: 10, color: '#6A6A6A', marginRight: 6, fontWeight: '600' },
+  langGroup: { flexDirection: 'column', gap: 4, alignItems: 'flex-end' },
   langChip: {
     borderWidth: 1,
     borderColor: '#CFC8BA',
-    borderRadius: 6,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    marginRight: 4,
-    marginBottom: 4,
+    borderRadius: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     backgroundColor: '#FFFFFFCC',
+    minWidth: 30,
+    alignItems: 'center',
   },
-  langChipActive: { borderColor: '#A8895F', backgroundColor: '#F9EFE0' },
-  langChipText: { fontSize: 9, color: '#666', fontWeight: '700' },
+  langChipActive: { borderColor: '#A8895F', backgroundColor: '#F5E9D5' },
+  langChipText: { fontSize: 10, color: '#666', fontWeight: '700' },
   langChipTextActive: { color: '#75572F' },
 
-  nameRow: { flexDirection: 'row', alignItems: 'baseline' },
-  nameDev: { fontSize: 20, fontWeight: '800', color: '#8F744A' },
-  nameEng: { fontSize: 28, fontWeight: '700', color: '#2A2F38' },
-  panchang: { fontSize: 12, color: '#3E4660', fontWeight: '700', marginTop: 2, lineHeight: 17 },
-  browserHint: { fontSize: 9, color: '#777', marginTop: 1 },
-
+  // ── Festivals ────────────────────────────────────────────
   festPanel: {
     borderWidth: 1,
     borderColor: '#E1D8C8',
-    backgroundColor: '#FBF7EE',
-    borderRadius: 12,
+    backgroundColor: '#FFFBF3',
+    borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    marginBottom: 6,
+    marginBottom: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
   },
   festTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#ECE7DD',
-    borderRadius: 8,
+    borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    marginBottom: 6,
-    alignSelf: 'flex-start',
   },
   festMajor: { backgroundColor: '#F4E6CE' },
   festText: { fontSize: 11, fontWeight: '700', color: '#555' },
   festMajorText: { color: '#7B5A2F' },
-  obsText: { fontSize: 12, color: '#696969', marginTop: 2 },
+  obsText: { fontSize: 11, color: '#696969' },
 
+  // ── Auth Strip ───────────────────────────────────────────
+  authStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E4E0D8',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 8,
+    gap: 6,
+  },
+  authEmail: { fontSize: 11, color: '#444', fontWeight: '600', flexShrink: 1 },
+  authGuestLabel: { fontSize: 11, color: '#888', flexShrink: 1 },
+  authProfileChip: {
+    fontSize: 10,
+    backgroundColor: '#E8F5E9',
+    color: '#2E7D32',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    fontWeight: '700',
+  },
+  authBtn: {
+    backgroundColor: '#F4F4F6',
+    borderRadius: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#DDD',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  authBtnText: { fontSize: 11, fontWeight: '700', color: '#444' },
+  authBtnLogout: { borderColor: '#FFCDD2', backgroundColor: '#FFF0F0' },
+  authBtnLogoutText: { color: '#C62828' },
+  authBtnSignIn: { backgroundColor: '#FF6D00', borderColor: '#FF6D00' },
+
+  helpQuickLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#D7DBE2',
+    backgroundColor: '#EEF1F5',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  helpQuickLinkLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  helpQuickLinkTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#3D4552',
+  },
+  helpQuickLinkSub: {
+    fontSize: 10,
+    color: '#6D7582',
+    marginTop: 1,
+  },
+
+  // ── Feature Grid ─────────────────────────────────────────
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'stretch',
-  },
-  tileWrap: {
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    rowGap: 8,
+    marginBottom: 8,
   },
   tile: {
-    backgroundColor: '#FCFCFD',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#DDD9D0',
+    paddingHorizontal: 10,
     paddingVertical: 14,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  tileSoon: { opacity: 0.52 },
-  tileGeometry: {
-    position: 'absolute',
-    top: 8,
-    right: 10,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#C2B59A',
-    backgroundColor: '#F7EEE0',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#8B0000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 7,
   },
-  tileGeometryText: { fontSize: 10, color: '#8E7653', fontWeight: '700' },
-  tileImg: {
-    width: 56,
-    height: 56,
+  tileSoon: { opacity: 0.45 },
+  iconBox: {
+    width: 52,
+    height: 52,
     borderRadius: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#E2DCCF',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: '#FFF0EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   tileName: {
+    fontSize: 13,
     fontWeight: '800',
-    color: '#2A2F38',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  tileSub: {
-    color: '#636A74',
-    marginTop: 4,
+    color: '#1C2130',
     textAlign: 'center',
     lineHeight: 18,
   },
+  tileSub: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
+    textAlign: 'center',
+    lineHeight: 15,
+  },
   badge: {
     backgroundColor: '#EAE4D8',
-    borderRadius: 9,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#D3C8B4',
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 5,
   },
-  badgeText: { fontSize: 10, fontWeight: '800', color: '#776241' },
-  tileIcon: {
-    fontSize: 22,
-    marginBottom: 10,
-    color: '#8E7653',
-  },
+  badgeText: { fontSize: 9, fontWeight: '800', color: '#776241' },
+
+  // ── Footer ───────────────────────────────────────────────
   footerCard: {
-    marginTop: 4,
-    marginBottom: 12,
-    borderRadius: 12,
+    marginBottom: 16,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#DBD3C3',
-    backgroundColor: '#FBF8F2',
+    borderColor: '#DDD5C4',
+    backgroundColor: '#FAF7F2',
     paddingHorizontal: 12,
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-    elevation: 2,
+    paddingVertical: 10,
   },
   footerText: {
-    fontSize: 12,
-    lineHeight: 20,
-    color: '#4D4D57',
-    textAlign: 'left',
+    fontSize: 11,
+    lineHeight: 18,
+    color: '#5A5A66',
+    textAlign: 'center',
   },
 });
