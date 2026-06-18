@@ -292,25 +292,6 @@ export default function HomeScreen({ navigation }: Props) {
           })}
         </View>
 
-        {/* Help at bottom (non-module placement) */}
-        <TouchableOpacity
-          style={st.helpQuickLinkBottom}
-          onPress={handleHelpPress}
-          activeOpacity={0.8}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          accessibilityRole="button"
-          accessibilityLabel="Help and FAQ"
-        >
-          <View style={st.helpQuickLinkLeft}>
-            <Ionicons name="help-circle-outline" size={16} color="#5B6576" />
-            <View>
-              <Text style={st.helpQuickLinkTitle}>{t('home.tiles.helpTitle', 'Help & FAQ')}</Text>
-              <Text style={st.helpQuickLinkSub}>{t('home.tiles.helpSub', 'Learn · Glossary · Q&A')}</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="#7F8794" />
-        </TouchableOpacity>
-
         {/* ── Footer ───────────────────────────────────────── */}
         <View style={st.footerCard}>
           <Text style={st.footerText}>Namaskar.</Text>
@@ -452,35 +433,6 @@ const st = StyleSheet.create({
   authBtnLogout: { borderColor: '#FFCDD2', backgroundColor: '#FFF0F0' },
   authBtnLogoutText: { color: '#C62828' },
   authBtnSignIn: { backgroundColor: '#FF6D00', borderColor: '#FF6D00' },
-
-  helpQuickLinkBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#D7DBE2',
-    backgroundColor: '#EEF1F5',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginTop: 2,
-    marginBottom: 8,
-  },
-  helpQuickLinkLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  helpQuickLinkTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#3D4552',
-  },
-  helpQuickLinkSub: {
-    fontSize: 10,
-    color: '#6D7582',
-    marginTop: 1,
-  },
 
   // ── Feature Grid ─────────────────────────────────────────
   grid: {
