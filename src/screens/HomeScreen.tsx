@@ -157,6 +157,15 @@ export default function HomeScreen({ navigation }: Props) {
     { code: 'ks', label: 'KS' },
   ];
 
+  const handleHelpPress = React.useCallback(() => {
+    // Use push when available so Help always opens even if navigation state is stale.
+    if (typeof (navigation as any)?.push === 'function') {
+      (navigation as any).push('Help');
+      return;
+    }
+    navigation.navigate('Help');
+  }, [navigation]);
+
   return (
     <ScrollView style={st.scroll} contentContainerStyle={[st.scrollInner, { paddingHorizontal: horizontalPadding }]}>
       <View style={[st.container, { maxWidth: maxContentWidth }]}>
@@ -249,24 +258,6 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
         )}
 
-        {/* Compact Help Link (kept outside feature modules grid) */}
-        <TouchableOpacity
-          style={st.helpQuickLink}
-          onPress={() => navigation.navigate('Help')}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Help and FAQ"
-        >
-          <View style={st.helpQuickLinkLeft}>
-            <Ionicons name="help-circle-outline" size={16} color="#5B6576" />
-            <View>
-              <Text style={st.helpQuickLinkTitle}>{t('home.tiles.helpTitle', 'Help & FAQ')}</Text>
-              <Text style={st.helpQuickLinkSub}>{t('home.tiles.helpSub', 'Learn · Glossary · Q&A')}</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="#7F8794" />
-        </TouchableOpacity>
-
         {/* ── Feature Grid ─────────────────────────────────── */}
         <View style={[st.grid, { gap: gridGap }]}>
           {tiles.map((tile, i) => {
@@ -301,10 +292,29 @@ export default function HomeScreen({ navigation }: Props) {
           })}
         </View>
 
+        {/* Help at bottom (non-module placement) */}
+        <TouchableOpacity
+          style={st.helpQuickLinkBottom}
+          onPress={handleHelpPress}
+          activeOpacity={0.8}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          accessibilityRole="button"
+          accessibilityLabel="Help and FAQ"
+        >
+          <View style={st.helpQuickLinkLeft}>
+            <Ionicons name="help-circle-outline" size={16} color="#5B6576" />
+            <View>
+              <Text style={st.helpQuickLinkTitle}>{t('home.tiles.helpTitle', 'Help & FAQ')}</Text>
+              <Text style={st.helpQuickLinkSub}>{t('home.tiles.helpSub', 'Learn · Glossary · Q&A')}</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#7F8794" />
+        </TouchableOpacity>
+
         {/* ── Footer ───────────────────────────────────────── */}
         <View style={st.footerCard}>
           <Text style={st.footerText}>
-            {'🙏🏻Namaskar,\n\nThis is our humble effort to help the KP community stay rooted in our traditions and values, while making important dates and tithis easily accessible on the go.\n\nThe calendar and tithi outputs are mathematically computed using trusted astronomical references, with precise calculation logic down to very fine time fractions.\n\nFor complete transparency, we encourage you to explore the "How This Works" section to understand the methodology behind each result.\n\nWe will continue to improve the app with regular updates, while keeping the experience simple, consistent, and meaningful for everyone!'}
+            {'Namaskar,\n\nThis is our effort to help the KP community stay rooted in traditions and values while making important dates and tithis easily accessible.\n\nCalendar and tithi outputs are computed using trusted astronomical references with precise calculation logic.\n\nFor transparency, please review the "How This Works" section to understand the methodology behind each result.\n\nWe will continue to improve the app with regular updates while keeping the experience simple and consistent.'}
           </Text>
         </View>
 
@@ -422,7 +432,7 @@ const st = StyleSheet.create({
   authBtnLogoutText: { color: '#C62828' },
   authBtnSignIn: { backgroundColor: '#FF6D00', borderColor: '#FF6D00' },
 
-  helpQuickLink: {
+  helpQuickLinkBottom: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -432,6 +442,7 @@ const st = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
+    marginTop: 2,
     marginBottom: 8,
   },
   helpQuickLinkLeft: {
