@@ -36,10 +36,19 @@ type Tile = {
   ionicon: IoniconName;
   title: string;
   sub: string;
+  tileImage: any;
   screen?: keyof RootStackParamList;
   params?: RootStackParamList[keyof RootStackParamList];
   soon?: boolean;
 };
+
+const tileCalendarImg = require('../assets/images/tiles/jan-main_tile.jpeg');
+const tileTithiImg = require('../assets/images/tiles/jan-tithi_tile.jpeg');
+const tileMuhuratImg = require('../assets/images/tiles/jan-saath_tile.jpeg');
+const tilePujaImg = require('../assets/images/tiles/jan-ganesha_tile.jpeg');
+const tileTekniImg = require('../assets/images/tiles/jan-tekni_tile.jpeg');
+const tileZatukImg = require('../assets/images/tiles/jan-zatuk_tile.jpeg');
+const tileJyotishImg = require('../assets/images/tiles/jan-patri_tile.jpeg');
 
 type LayoutProfile = 'mobile' | 'tablet' | 'desktop';
 
@@ -83,42 +92,49 @@ export default function HomeScreen({ navigation }: Props) {
   const tiles: Tile[] = [
     {
       ionicon: 'calendar-outline',
+      tileImage: tileCalendarImg,
       title: t('home.tiles.calendarTitle', 'KP Calendar'),
       sub: t('home.tiles.calendarSub', 'Festivals · Tithis · Print'),
       screen: 'Calendar',
     },
     {
       ionicon: 'moon-outline',
+      tileImage: tileTithiImg,
       title: t('home.tiles.tithiTitle', 'Tithi Calculator'),
       sub: t('home.tiles.tithiSub', 'Lunar date for any day'),
       screen: 'TithiCalculator',
     },
     {
       ionicon: 'star-outline',
+      tileImage: tileMuhuratImg,
       title: t('home.tiles.muhuratTitle', 'Shubh Muhurat'),
       sub: t('home.tiles.muhuratSub', 'Auspicious timings'),
       screen: 'MuhuratEventPicker',
     },
     {
       ionicon: 'flame-outline',
+      tileImage: tilePujaImg,
       title: t('home.tiles.pujaTitle', "Pu'za Paath"),
       sub: t('home.tiles.pujaSub', 'Interactive · Step by step'),
       screen: 'PujaHome',
     },
     {
       ionicon: 'document-text-outline',
+      tileImage: tileTekniImg,
       title: t('home.tiles.tekniTitle', 'Tekni'),
       sub: t('home.tiles.tekniSub', 'Janam Kundali · PDF'),
       screen: 'TekniInput',
     },
     {
       ionicon: 'telescope-outline',
+      tileImage: tileZatukImg,
       title: t('home.tiles.zatukTitle', 'Zatuk'),
       sub: t('home.tiles.zatukSub', 'Full Horoscope'),
       soon: true,
     },
     {
       ionicon: 'planet-outline',
+      tileImage: tileJyotishImg,
       title: t('home.tiles.jyotishTitle', 'Jyotish'),
       sub: t('home.tiles.jyotishSub', 'Vedic Astrology'),
       soon: true,
@@ -264,7 +280,7 @@ export default function HomeScreen({ navigation }: Props) {
             const inner = (
               <View style={[st.tile, { height: tileHeight }, tile.soon && st.tileSoon]}>
                 <View style={st.iconBox}>
-                  <Ionicons name={tile.ionicon} size={28} color='#8B0000' />
+                  <Image source={tile.tileImage} style={st.tileIconImage} />
                 </View>
                 <Text style={st.tileName} numberOfLines={2}>{tile.title}</Text>
                 <Text style={st.tileSub} numberOfLines={2}>{tile.sub}</Text>
@@ -508,10 +524,17 @@ const st = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 14,
-    backgroundColor: '#FFF0EE',
+    backgroundColor: '#F6F2EA',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2D8C7',
+  },
+  tileIconImage: {
+    width: '100%',
+    height: '100%',
   },
   tileName: {
     fontSize: 13,
