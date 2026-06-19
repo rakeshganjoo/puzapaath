@@ -1113,17 +1113,17 @@ We guide you step-by-step through Janam Din Puja with timing, mantras, and expla
 **Flexibility:**
 You don't need to buy everything new. Use what you have at home. Flowers from your garden work beautifully. If you don't have a bell or conch, that's fine—the intention matters most.
 
-**Budget Option (~$10–15 total):**
-- Grocery store flowers + incense
+**Simple Sourcing (what you likely have):**
+- Garden flowers or grocery store blooms + incense
 - Coconut oil as lamp oil
-- Store-bought sweets
-- Use a regular glass bowl as lamp
+- Store-bought or homemade sweets
+- Use any small bowl as lamp
 
-**Fancy Option (~$25–40 total):**
-- Fresh flowers from florist
-- Premium incense
-- Ghee in lamp
-- Homemade or premium sweets
+**Enhanced Sourcing (if you prefer):**
+- Fresh flowers from local florist or farmer's market
+- Premium or specialty incense
+- Pure ghee in lamp
+- Homemade or artisanal sweets from your community
 
 **Pro Tip:** Many Indian festivals and temples sell pre-made puja kits. Check your local temple!`,
   },
