@@ -1081,33 +1081,37 @@ We guide you step-by-step through Janam Din Puja with timing, mantras, and expla
 
 **What you need for Janam Din Puja:**
 
-| Item | Where to Find | Approximate Cost |
-|------|---------------|------------------|
-| Flowers (marigolds) | Grocery store, flower shop | $2–5 |
-| Incense (agarbatti) | Indian grocery, Amazon | $2–3 |
-| Oil lamp (diya) | Indian store, Amazon | $1–3 |
-| Ghee | Indian grocery, regular grocery | $3–5 |
-| Sweets (laddu, barfi) | Indian bakery, grocery store | $3–5 |
-| Water | Tap water (free) | Free |
-| Bell (ghanti) | Amazon, Indian store | $2–8 |
+| Item | Where to Find |
+|------|---------------|
+| Flowers (marigolds, jasmine) | Grocery store, flower shop, garden |
+| Incense (agarbatti) | Indian grocery store |
+| Oil lamp (diya) | Indian store, local temple gift shops |
+| Ghee (clarified butter) | Indian grocery, regular grocery |
+| Sweets (laddu, barfi) | Indian bakery, grocery store |
+| Water | Tap water |
+| Bell (ghanti) | Indian store, temple gift shop |
+| Conch shell (if desired) | Indian store, or skip it |
 
-**Quick Sourcing Tips:**
+**Where to Source:**
 
-**Indian Grocery Stores** (if in your area)
-- Best selection, reasonable prices
-- Likely have pre-made puja kits
-- Staff can help with advice
+**Indian Grocery Stores**
+- Full selection of authentic items
+- Knowledgeable staff who can help
+- Community-oriented sourcing
 
-**Online (Amazon, Google Shopping)**
-- Convenient, reliable
-- "Puja Kit" bundles available (~$15–25)
-- 2–3 day delivery
+**Local Temples**
+- Gift shops often carry samagri
+- Support your local temple community
+- Staff familiar with puja needs
 
 **Regular Grocery Stores**
-- Flowers (produce section)
-- Oil (cooking oils work)
-- Sweets (bakery section)
-- Water (tap is fine)
+- Flowers from produce section
+- Ghee and oils from pantry section
+- Sweets from bakery section
+- Water from tap
+
+**Flexibility:**
+You don't need to buy everything new. Use what you have at home. Flowers from your garden work beautifully. If you don't have a bell or conch, that's fine—the intention matters most.
 
 **Budget Option (~$10–15 total):**
 - Grocery store flowers + incense
